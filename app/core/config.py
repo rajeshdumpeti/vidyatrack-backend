@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     db_name: str = Field(default="vidyatrack", alias="DB_NAME")
     db_user: str = Field(default="vidyatrack", alias="DB_USER")
     db_password: str = Field(default="change_me", alias="DB_PASSWORD")
+    # Auth / Security
+    jwt_secret: str = Field(default="change_me", alias="JWT_SECRET")
+    jwt_ttl_minutes: int = Field(default=30, alias="JWT_TTL_MINUTES")
+    otp_pepper: str = Field(default="change_me", alias="OTP_PEPPER")
+    otp_ttl_minutes: int = Field(default=5, alias="OTP_TTL_MINUTES")
 
 
     # Pydantic v2 settings configuration
