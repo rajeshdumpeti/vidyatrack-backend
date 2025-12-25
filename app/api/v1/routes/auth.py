@@ -31,6 +31,7 @@ class OtpRequestIn(BaseModel):
 class OtpRequestOut(BaseModel):
     status: str
 
+
 class OtpVerifyIn(BaseModel):
     phone: str
     otp: str
@@ -45,6 +46,7 @@ def _hash_otp(phone: str, otp: str) -> str:
     payload = f"{phone}:{otp}:{OTP_PEPPER}".encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
+
 def _b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
 
@@ -52,15 +54,17 @@ def _b64url_encode(data: bytes) -> str:
 def _jwt_encode_hs256(payload: dict) -> str:
     header = {"alg": "HS256", "typ": "JWT"}
 
-    header_b64 = _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
-    payload_b64 = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    header_b64 = _b64url_encode(json.dumps(
+        header, separators=(",", ":")).encode("utf-8"))
+    payload_b64 = _b64url_encode(json.dumps(
+        payload, separators=(",", ":")).encode("utf-8"))
 
     signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
-    sig = hmac.new(JWT_SECRET.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    sig = hmac.new(JWT_SECRET.encode("utf-8"),
+                   signing_input, hashlib.sha256).digest()
     sig_b64 = _b64url_encode(sig)
 
     return f"{header_b64}.{payload_b64}.{sig_b64}"
-
 
 
 @router.post("/otp/request", response_model=OtpRequestOut, status_code=200)
@@ -68,7 +72,8 @@ def request_otp(payload: OtpRequestIn, db: Session = Depends(get_db)):
     otp = f"{secrets.randbelow(1_000_000):06d}"
     otp_hash = _hash_otp(payload.phone, otp)
 
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES)
+    expires_at = datetime.now(timezone.utc) + \
+        timedelta(minutes=OTP_TTL_MINUTES)
 
     row = OtpRequest(
         phone=payload.phone,
@@ -81,10 +86,11 @@ def request_otp(payload: OtpRequestIn, db: Session = Depends(get_db)):
     db.commit()
 
     # Pilot mode: OTP "send" is console/log only
-    print(f"[OTP] phone={payload.phone} otp={otp} expires_in_min={OTP_TTL_MINUTES}")
+    if settings.environment == "dev" and settings.debug:
+        print(
+            f"[OTP] phone={payload.phone} otp={otp} expires_in_min={OTP_TTL_MINUTES}")
 
     return {"status": "otp_sent"}
-
 
 
 @router.post("/otp/verify", response_model=TokenOut, status_code=200)
@@ -102,10 +108,12 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
     )
 
     if not otp_row:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="otp_not_found")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="otp_not_found")
 
     if otp_row.expires_at <= now:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="otp_expired")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="otp_expired")
 
     expected_hash = otp_row.otp_hash
     provided_hash = _hash_otp(payload.phone, payload.otp)
@@ -114,7 +122,8 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
         otp_row.attempt_count = (otp_row.attempt_count or 0) + 1
         db.add(otp_row)
         db.commit()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="otp_invalid")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="otp_invalid")
 
     otp_row.consumed_at = now
     db.add(otp_row)
@@ -126,7 +135,8 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
         .first()
     )
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
 
     exp = now + timedelta(minutes=JWT_TTL_MINUTES)
 
@@ -140,4 +150,3 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
 
     token = _jwt_encode_hs256(token_payload)
     return {"access_token": token, "token_type": "bearer"}
-
