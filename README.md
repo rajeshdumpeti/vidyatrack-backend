@@ -258,3 +258,15 @@ If you want, next we can:
 
 You decide the next step.
 ```
+
+<!-- Precees to create API for this project -->
+
+Create file in modals first and schema
+import in modals/**init**.py
+then run -- below two lines
+alembic revision --autogenerate -m "create classes and sections tables"
+alembic upgrade head
+which creates file in alembic/versions example: d424429bc79d_create_classes_and_sections_tables.py
+Then create new file example : app/api/v1/routes/classes.py
+then add from app.api.v1.routes import classes in app/api/v1/router.py and include api_router.include_router(classes.router) in same file
+test create api's in postman
