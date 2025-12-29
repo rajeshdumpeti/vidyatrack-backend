@@ -11,6 +11,8 @@ from app.api.v1.routes import sections
 from app.api.v1.routes import attendance
 from app.api.v1.routes import subjects
 from app.api.v1.routes import marks
+from app.api.v1.routes import notifications
+
 
 api_router = APIRouter()
 
@@ -26,3 +28,4 @@ api_router.include_router(sections.router)
 api_router.include_router(attendance.router)
 api_router.include_router(subjects.router)
 api_router.include_router(marks.router)
+api_router.include_router(notifications.router)
