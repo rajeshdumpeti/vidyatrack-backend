@@ -10,7 +10,7 @@ from app.api.v1.routes import classes
 from app.api.v1.routes import sections
 from app.api.v1.routes import attendance
 from app.api.v1.routes import subjects
-
+from app.api.v1.routes import marks
 
 api_router = APIRouter()
 
@@ -25,3 +25,4 @@ api_router.include_router(classes.router)
 api_router.include_router(sections.router)
 api_router.include_router(attendance.router)
 api_router.include_router(subjects.router)
+api_router.include_router(marks.router)
