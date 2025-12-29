@@ -9,3 +9,5 @@ from app.db.models.attendance_record import AttendanceRecord
 from app.db.models.attendance_submission import AttendanceSubmission  # noqa: F401
 from app.db.models.notification_outbox import NotificationOutbox  # noqa: F401
 from app.db.models.subject import Subject  # noqa: F401
+from app.db.models.marks_record import MarksRecord  # noqa: F401
+from app.db.models.marks_submission import MarksSubmission  # noqa: F401
