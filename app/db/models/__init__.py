@@ -5,3 +5,6 @@ from app.db.models.otp_request import OtpRequest
 from app.db.models.student import Student
 from app.db.models.class_ import Class
 from app.db.models.section import Section
+from app.db.models.attendance_record import AttendanceRecord
+from app.db.models.attendance_submission import AttendanceSubmission  # noqa: F401
+from app.db.models.notification_outbox import NotificationOutbox  # noqa: F401
