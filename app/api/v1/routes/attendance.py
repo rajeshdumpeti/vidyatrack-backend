@@ -1,3 +1,5 @@
+import json
+
 from datetime import date as date_type
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -10,7 +12,7 @@ from app.db.models.attendance_record import AttendanceRecord
 from app.db.models.student import Student
 from app.db.models.attendance_submission import AttendanceSubmission
 from app.db.models.section import Section
-
+from app.db.models.notification_outbox import NotificationOutbox
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
@@ -158,10 +160,47 @@ def submit_attendance(
         date=payload.date,
         submitted_by_user_id=current_user["user_id"],
     )
+
     db.add(row)
 
     try:
+        # flush so row.id is available before enqueue
+        db.flush()
+
+        # recipients = all students in the submitted section for this school
+        students = (
+            db.query(Student)
+            .filter(
+                Student.school_id == current_user["school_id"],
+                Student.section_id == payload.section_id,
+            )
+            .all()
+        )
+
+        # enqueue outbox rows (deduped by unique constraint)
+        for s in students:
+            db.add(
+                NotificationOutbox(
+                    school_id=current_user["school_id"],
+                    event_type="ATTENDANCE_SUBMITTED",
+                    attendance_submission_id=row.id,
+                    marks_submission_id=None,
+                    recipient_phone=s.parent_phone,
+                    payload=json.dumps(
+                        {
+                            "type": "attendance_submitted",
+                            "date": str(payload.date),
+                            "student_id": s.id,
+                            "section_id": payload.section_id,
+                        }
+                    ),
+                    status="PENDING",
+                    attempts=0,
+                )
+            )
+
         db.commit()
+
     except IntegrityError:
         db.rollback()
 
@@ -175,15 +214,11 @@ def submit_attendance(
             .first()
         )
         if existing:
-            # True idempotency: already submitted => return existing as 200
+            # Idempotent submit: do NOT enqueue again
             response.status_code = status.HTTP_200_OK
             return existing
 
-        # Unexpected case: unique hit but row not found
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="already_submitted",
-        )
+        raise HTTPException(status_code=409, detail="already_submitted")
 
     db.refresh(row)
     return row
