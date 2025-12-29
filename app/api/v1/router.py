@@ -6,6 +6,8 @@ from app.api.v1.routes import teachers
 from app.api.v1.routes import auth
 from app.api.v1.routes import auth_debug
 from app.api.v1.routes import students
+from app.api.v1.routes import classes
+from app.api.v1.routes import sections
 
 
 api_router = APIRouter()
@@ -17,3 +19,5 @@ api_router.include_router(teachers.router)
 api_router.include_router(auth.router)
 api_router.include_router(auth_debug.router)
 api_router.include_router(students.router)
+api_router.include_router(classes.router)
+api_router.include_router(sections.router)
