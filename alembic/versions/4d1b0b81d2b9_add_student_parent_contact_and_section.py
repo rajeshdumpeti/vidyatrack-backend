@@ -31,7 +31,7 @@ def upgrade() -> None:
 
     # 2. Backfill parent_phone for existing rows (pilot-safe default)
     op.execute(
-        "UPDATE students SET parent_phone = '+910000000000' WHERE parent_phone IS NULL"
+        "UPDATE students SET parent_phone = '1000000000' WHERE parent_phone IS NULL"
     )
 
     # 3. Enforce NOT NULL after data is safe

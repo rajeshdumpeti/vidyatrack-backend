@@ -6,6 +6,7 @@ from app.core.logging import setup_logging
 import time
 import logging
 from starlette.requests import Request
+from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,19 @@ app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
 )
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",        # Vite dev
+        "http://127.0.0.1:5173",        # Vite dev (alt)
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
