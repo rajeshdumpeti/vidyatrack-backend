@@ -12,6 +12,7 @@ from app.api.v1.routes import attendance
 from app.api.v1.routes import subjects
 from app.api.v1.routes import marks
 from app.api.v1.routes import notifications
+from app.api.v1.routes.teacher_me import router as teacher_me_router
 
 
 api_router = APIRouter()
@@ -29,3 +30,4 @@ api_router.include_router(attendance.router)
 api_router.include_router(subjects.router)
 api_router.include_router(marks.router)
 api_router.include_router(notifications.router)
+api_router.include_router(teacher_me_router)
