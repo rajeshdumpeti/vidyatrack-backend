@@ -69,7 +69,7 @@ def _jwt_encode_hs256(payload: dict) -> str:
 
 @router.post("/otp/request", response_model=OtpRequestOut, status_code=200)
 def request_otp(payload: OtpRequestIn, db: Session = Depends(get_db)):
-    otp = f"{secrets.randbelow(1_000_000):06d}"
+    otp = f"{secrets.randbelow(10_000):04d}"
     otp_hash = _hash_otp(payload.phone, otp)
 
     expires_at = datetime.now(timezone.utc) + \

@@ -1,3 +1,5 @@
+import json
+
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -8,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.deps import get_db, get_current_user
 from app.db.models.marks_record import MarksRecord
 from app.db.models.marks_submission import MarksSubmission
+from app.db.models.notification_outbox import NotificationOutbox
 from app.db.models.section import Section
 from app.db.models.student import Student
 from app.db.models.subject import Subject
@@ -58,6 +61,44 @@ class MarksSubmissionOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def _enqueue_marks_outbox(
+    *,
+    db: Session,
+    school_id: int,
+    section_id: int,
+    subject_id: int,
+    exam_type: str,
+    marks_submission_id: int,
+) -> None:
+    students = (
+        db.query(Student)
+        .filter(Student.school_id == school_id, Student.section_id == section_id)
+        .all()
+    )
+
+    for s in students:
+        db.add(
+            NotificationOutbox(
+                school_id=school_id,
+                event_type="MARKS_SUBMITTED",
+                attendance_submission_id=None,
+                marks_submission_id=marks_submission_id,
+                recipient_phone=s.parent_phone,
+                payload=json.dumps(
+                    {
+                        "type": "marks_submitted",
+                        "section_id": section_id,
+                        "subject_id": subject_id,
+                        "exam_type": exam_type,
+                        "student_id": s.id,
+                    }
+                ),
+                status="PENDING",
+                attempts=0,
+            )
+        )
 
 
 @router.post("/record", response_model=MarksRecordOut, status_code=201)
@@ -174,6 +215,41 @@ def submit_marks(
     db.add(row)
 
     try:
+        # flush so row.id is available before enqueue
+        db.flush()
+
+        # recipients = all students in the submitted section for this school
+        students = (
+            db.query(Student)
+            .filter(
+                Student.school_id == current_user["school_id"],
+                Student.section_id == payload.section_id,
+            )
+            .all()
+        )
+        # enqueue outbox rows (deduped by unique constraint)
+        for s in students:
+            db.add(
+                NotificationOutbox(
+                    school_id=current_user["school_id"],
+                    event_type="MARKS_SUBMITTED",
+                    attendance_submission_id=None,
+                    marks_submission_id=row.id,
+                    recipient_phone=s.parent_phone,
+                    payload=json.dumps(
+                        {
+                            "type": "marks_submitted",
+                            "section_id": payload.section_id,
+                            "subject_id": payload.subject_id,
+                            "exam_type": payload.exam_type,
+                            "student_id": s.id,
+                        }
+                    ),
+                    status="PENDING",
+                    attempts=0,
+                )
+            )
+
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -189,6 +265,16 @@ def submit_marks(
             .first()
         )
         if existing:
+            # Idempotent submit: ensure outbox exists (dedupe handled by DB uniqueness)
+            _enqueue_marks_outbox(
+                db=db,
+                school_id=current_user["school_id"],
+                section_id=payload.section_id,
+                subject_id=payload.subject_id,
+                exam_type=payload.exam_type,
+                marks_submission_id=existing.id,
+            )
+            db.commit()
             response.status_code = status.HTTP_200_OK
             return existing
 

@@ -88,5 +88,11 @@ class NotificationOutbox(Base):
         nullable=False,
         server_default=func.now(),
     )
+    next_attempt_at: Mapped["DateTime"] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
     sent_at: Mapped["DateTime | None"] = mapped_column(
         DateTime(timezone=True), nullable=True)
