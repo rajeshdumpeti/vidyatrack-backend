@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
 from app.api.v1.deps import get_db, get_current_user
 from app.db.models.attendance_record import AttendanceRecord
 from app.db.models.student import Student
@@ -117,36 +118,18 @@ def create_attendance(
 @router.get("", response_model=list[AttendanceOut])
 def list_attendance(
     date: date_type = Query(..., description="Attendance date in YYYY-MM-DD"),
-    section_id: int | None = Query(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    q = (
+    return (
         db.query(AttendanceRecord)
         .filter(
             AttendanceRecord.school_id == current_user["school_id"],
             AttendanceRecord.date == date,
         )
+        .order_by(AttendanceRecord.id.asc())
+        .all()
     )
-
-    if section_id is not None:
-        sec = (
-            db.query(Section)
-            .filter(
-                Section.id == section_id,
-                Section.school_id == current_user["school_id"],
-            )
-            .first()
-        )
-        if not sec:
-            raise HTTPException(status_code=400, detail="invalid_section_id")
-
-        q = (
-            q.join(Student, Student.id == AttendanceRecord.student_id)
-             .filter(Student.section_id == section_id)
-        )
-
-    return q.order_by(AttendanceRecord.id.asc()).all()
 
 
 @router.post("/submit", response_model=AttendanceSubmissionOut, status_code=201)
