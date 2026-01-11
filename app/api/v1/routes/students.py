@@ -1,10 +1,11 @@
-from typing import List, Optional
+from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_db, get_current_user
+from app.api.v1.deps import get_current_user, get_db
+from app.db.models.section import Section
 from app.db.models.student import Student
 
 router = APIRouter(prefix="/students", tags=["students"])
@@ -12,7 +13,6 @@ router = APIRouter(prefix="/students", tags=["students"])
 
 class StudentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
     name: str
 
 
@@ -27,15 +27,28 @@ class StudentOut(BaseModel):
 
 @router.get("", response_model=List[StudentOut])
 def list_students(
+    section_id: int | None = Query(None),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    return (
-        db.query(Student)
-        .filter(Student.school_id == current_user["school_id"])
-        .order_by(Student.id.asc())
-        .all()
-    )
+    q = db.query(Student).filter(
+        Student.school_id == current_user["school_id"])
+
+    if section_id is not None:
+        sec = (
+            db.query(Section)
+            .filter(
+                Section.id == section_id,
+                Section.school_id == current_user["school_id"],
+            )
+            .first()
+        )
+        if not sec:
+            raise HTTPException(status_code=400, detail="invalid_section_id")
+
+        q = q.filter(Student.section_id == section_id)
+
+    return q.order_by(Student.id.asc()).all()
 
 
 @router.post("", response_model=StudentOut, status_code=201)

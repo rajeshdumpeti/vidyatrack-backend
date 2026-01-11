@@ -12,3 +12,4 @@ from app.db.models.subject import Subject  # noqa: F401
 from app.db.models.marks_record import MarksRecord  # noqa: F401
 from app.db.models.marks_submission import MarksSubmission  # noqa: F401
 from app.db.models.notification_outbox import NotificationOutbox  # noqa: F401
+from app.db.models.teacher_primary_section import TeacherPrimarySection
