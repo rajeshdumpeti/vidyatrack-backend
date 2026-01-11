@@ -88,3 +88,12 @@ def require_management(current_user: dict = Depends(get_current_user)) -> dict:
             detail="insufficient_permissions",
         )
     return current_user
+
+
+def require_teacher(current_user: dict = Depends(get_current_user)) -> dict:
+    if current_user.get("role") != "TEACHER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+    return current_user
