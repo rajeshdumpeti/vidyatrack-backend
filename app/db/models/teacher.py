@@ -8,15 +8,13 @@ from app.db.base import Base
 class Teacher(Base):
     __tablename__ = "teachers"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     school_id: Mapped[int] = mapped_column(
-        ForeignKey("schools.id"), nullable=False)
-
-    user_id: Mapped[int] = mapped_column(   # ✅ ADD THIS
-        ForeignKey("users.id", ondelete="CASCADE"),
+        Integer,
+        ForeignKey("schools.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        unique=True,   # one user = one teacher (pilot)
     )
 
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
