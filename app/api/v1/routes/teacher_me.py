@@ -25,13 +25,12 @@ def get_attendance_section(
     current_user: dict = Depends(require_teacher),
 ):
     # Resolve Teacher row for this user+school.
-    # IMPORTANT: this assumes Teacher has user_id. If your Teacher table uses a different mapping,
-    # replace the filter accordingly but keep tenant scoping.
+    # Mapping: teachers.id == users.id for TEACHER users.
     teacher = (
         db.query(Teacher)
         .filter(
             Teacher.school_id == current_user["school_id"],
-            Teacher.user_id == current_user["user_id"],
+            Teacher.id == current_user["user_id"],
         )
         .first()
     )
