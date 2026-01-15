@@ -15,9 +15,13 @@ class User(Base):
         index=True,
     )
 
-    phone: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
+    phone: Mapped[str] = mapped_column(
+        String(20), nullable=False, unique=True, index=True)
 
+    email: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, index=True)
     # MVP roles: MANAGEMENT | PRINCIPAL | TEACHER
     role: Mapped[str] = mapped_column(String(32), nullable=False)
 
-    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True)

@@ -78,6 +78,8 @@ def management_create_teacher(
     if candidates:
         existing_user = q.filter((candidates[0]) if len(
             candidates) == 1 else (candidates[0] | candidates[1])).first()
+        if payload.email:
+            candidates.append(User.email == payload.email)
 
     if existing_user:
         # Ensure teacher row exists for this user (pilot: 1 user -> 1 teacher)
@@ -121,6 +123,7 @@ def management_create_teacher(
     user = User(
         school_id=school_id,
         role="TEACHER",
+        email=payload.email,
         phone=payload.phone,
     )
     db.add(user)
