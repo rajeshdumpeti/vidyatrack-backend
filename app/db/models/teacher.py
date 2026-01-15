@@ -15,6 +15,11 @@ class Teacher(Base):
         nullable=False,
         index=True,
     )
-
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        unique=True,  # pilot: one user maps to one teacher
+    )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
