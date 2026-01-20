@@ -30,7 +30,7 @@ def get_attendance_section(
         db.query(Teacher)
         .filter(
             Teacher.school_id == current_user["school_id"],
-            Teacher.id == current_user["user_id"],
+            Teacher.user_id == current_user["user_id"],
         )
         .first()
     )

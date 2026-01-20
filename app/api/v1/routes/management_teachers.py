@@ -6,7 +6,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_db, require_management
+from app.core.phone import normalize_phone, phone_candidates
 from app.db.models.teacher import Teacher
+from app.db.models.teacher_primary_section import TeacherPrimarySection
+from app.db.models.section import Section
 # keep this import path consistent with your project
 from app.db.models.user import User
 
@@ -22,6 +25,7 @@ class ManagementCreateTeacherIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     email: str | None = Field(default=None, min_length=5, max_length=255)
     phone: str | None = Field(default=None, min_length=10, max_length=20)
+    section_id: int
     # keep if you want, but must NOT be sent; or remove field entirely
     role: str | None = None
 
@@ -42,7 +46,7 @@ class ManagementCreateTeacherIn(BaseModel):
 
         # optional phone normalization (trim only)
         if self.phone is not None:
-            self.phone = self.phone.strip()
+            self.phone = normalize_phone(self.phone)
 
         return self
 
@@ -53,6 +57,7 @@ class ManagementCreateTeacherOut(BaseModel):
     name: str
     email: str | None = None
     phone: str | None = None
+    section_id: int
 
     class Config:
         from_attributes = True
@@ -67,12 +72,20 @@ def management_create_teacher(
 ):
     school_id = current_user["school_id"]
 
+    section = (
+        db.query(Section)
+        .filter(Section.school_id == school_id, Section.id == payload.section_id)
+        .first()
+    )
+    if not section:
+        raise HTTPException(status_code=400, detail="invalid_section_id")
+
     # Idempotency lookup: same school + same email OR same phone
     q = db.query(User).filter(User.school_id == school_id)
 
     candidates = []
     if payload.phone:
-        candidates.append(User.phone == payload.phone)
+        candidates.append(User.phone.in_(phone_candidates(payload.phone)))
 
     existing_user = None
     if candidates:
@@ -92,6 +105,24 @@ def management_create_teacher(
             .first()
         )
         if existing_teacher:
+            mapping = (
+                db.query(TeacherPrimarySection)
+                .filter(
+                    TeacherPrimarySection.school_id == school_id,
+                    TeacherPrimarySection.teacher_id == existing_teacher.id,
+                )
+                .first()
+            )
+            if mapping:
+                mapping.section_id = payload.section_id
+            else:
+                mapping = TeacherPrimarySection(
+                    school_id=school_id,
+                    teacher_id=existing_teacher.id,
+                    section_id=payload.section_id,
+                )
+                db.add(mapping)
+            db.commit()
             response.status_code = status.HTTP_200_OK
             return ManagementCreateTeacherOut(
                 user_id=existing_user.id,
@@ -99,6 +130,7 @@ def management_create_teacher(
                 name=existing_teacher.name,
                 email=existing_teacher.email,
                 phone=payload.phone,  # phone not stored on Teacher model currently
+                section_id=payload.section_id,
             )
 
         # User exists but teacher missing -> create teacher row (201)
@@ -108,6 +140,14 @@ def management_create_teacher(
             name=payload.name,
         )
         db.add(teacher)
+        db.flush()
+
+        mapping = TeacherPrimarySection(
+            school_id=school_id,
+            teacher_id=teacher.id,
+            section_id=payload.section_id,
+        )
+        db.add(mapping)
         db.commit()
         db.refresh(teacher)
 
@@ -117,6 +157,7 @@ def management_create_teacher(
             name=teacher.name,
             email=teacher.email,
             phone=payload.phone,
+            section_id=payload.section_id,
         )
 
     # Create BOTH: User + Teacher (role forced server-side)
@@ -135,6 +176,14 @@ def management_create_teacher(
         name=payload.name,
     )
     db.add(teacher)
+    db.flush()
+
+    mapping = TeacherPrimarySection(
+        school_id=school_id,
+        teacher_id=teacher.id,
+        section_id=payload.section_id,
+    )
+    db.add(mapping)
 
     db.commit()
     db.refresh(user)
@@ -146,4 +195,5 @@ def management_create_teacher(
         name=teacher.name,
         email=teacher.email,
         phone=payload.phone,
+        section_id=payload.section_id,
     )

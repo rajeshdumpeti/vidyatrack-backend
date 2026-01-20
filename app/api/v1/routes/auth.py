@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_db
+from app.core.phone import normalize_phone, phone_candidates
 from app.db.models.otp_request import OtpRequest
 from app.db.models.user import User
 from app.core.config import settings
@@ -69,14 +70,15 @@ def _jwt_encode_hs256(payload: dict) -> str:
 
 @router.post("/otp/request", response_model=OtpRequestOut, status_code=200)
 def request_otp(payload: OtpRequestIn, db: Session = Depends(get_db)):
+    normalized_phone = normalize_phone(payload.phone)
     otp = f"{secrets.randbelow(10_000):04d}"
-    otp_hash = _hash_otp(payload.phone, otp)
+    otp_hash = _hash_otp(normalized_phone, otp)
 
     expires_at = datetime.now(timezone.utc) + \
         timedelta(minutes=OTP_TTL_MINUTES)
 
     row = OtpRequest(
-        phone=payload.phone,
+        phone=normalized_phone,
         otp_hash=otp_hash,
         expires_at=expires_at,
         attempt_count=0,
@@ -88,7 +90,7 @@ def request_otp(payload: OtpRequestIn, db: Session = Depends(get_db)):
     # Pilot mode: OTP "send" is console/log only
     if settings.environment == "dev" and settings.debug:
         print(
-            f"[OTP] phone={payload.phone} otp={otp} expires_in_min={OTP_TTL_MINUTES}")
+            f"[OTP] phone={normalized_phone} {otp} expires_in_min={OTP_TTL_MINUTES}")
 
     return {"status": "otp_sent"}
 
@@ -96,11 +98,12 @@ def request_otp(payload: OtpRequestIn, db: Session = Depends(get_db)):
 @router.post("/otp/verify", response_model=TokenOut, status_code=200)
 def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
+    normalized_phone = normalize_phone(payload.phone)
 
     otp_row = (
         db.query(OtpRequest)
         .filter(
-            OtpRequest.phone == payload.phone,
+            OtpRequest.phone == normalized_phone,
             OtpRequest.consumed_at.is_(None),
         )
         .order_by(OtpRequest.id.desc())
@@ -116,7 +119,7 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST, detail="otp_expired")
 
     expected_hash = otp_row.otp_hash
-    provided_hash = _hash_otp(payload.phone, payload.otp)
+    provided_hash = _hash_otp(normalized_phone, payload.otp)
 
     if not hmac.compare_digest(expected_hash, provided_hash):
         otp_row.attempt_count = (otp_row.attempt_count or 0) + 1
@@ -131,7 +134,8 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
 
     user = (
         db.query(User)
-        .filter(User.phone == payload.phone, User.is_active.is_(True))
+        .filter(User.is_active.is_(True))
+        .filter(User.phone.in_(phone_candidates(payload.phone)))
         .first()
     )
     if not user:
