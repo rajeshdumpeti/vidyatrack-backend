@@ -1,0 +1,40 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # No tests yet: we still validate imports to catch broken builds early.
+      - name: Import sanity check
+        run: |
+          python -c "import fastapi; print('fastapi ok')"
+
+      # Optional: if you already use ruff/black/isort, we can enforce later.
+      - name: Basic syntax check (compileall)
+        run: |
+          python -m compileall -q .
