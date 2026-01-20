@@ -1,0 +1,4564 @@
+/README.md:
+--------------------------------------------------------------------------------
+   1 | # vidyatrack-backend
+   2 | 
+   3 | Backend service for the **VidyaTrack** platform.
+   4 | 
+   5 | This repository contains the backend API built using **FastAPI**, following an enterprise-grade, modular, and versioned architecture.  
+   6 | The backend is designed to be **upgrade-friendly**, **maintainable**, and **production-ready**, starting with health checks and expanding toward authentication, RBAC, and database-backed features.
+   7 | 
+   8 | ---
+   9 | 
+  10 | ## Tech Stack
+  11 | 
+  12 | - **Language:** Python 3.12
+  13 | - **Framework:** FastAPI
+  14 | - **ASGI Server:** Uvicorn
+  15 | - **Dependency Management:** pip + requirements.txt
+  16 | - **(Upcoming):**
+  17 |   - SQLAlchemy (ORM)
+  18 |   - Alembic (DB migrations)
+  19 |   - PostgreSQL
+  20 | 
+  21 | ---
+  22 | 
+  23 | ## Project Structure
+  24 | 
+  25 | backend/
+  26 | ├── app/
+  27 | │ ├── main.py # Application entry point
+  28 | │ ├── api/
+  29 | │ │ └── v1/ # Versioned API layer
+  30 | │ │ ├── router.py
+  31 | │ │ └── routes/
+  32 | │ │ └── health.py # Health check endpoints
+  33 | │ ├── core/ # Config, logging, security (upcoming)
+  34 | │ └── db/ # Database, ORM, migrations (upcoming)
+  35 | ├── requirements.txt
+  36 | ├── README.md
+  37 | ├── .gitignore
+  38 | └── .venv/ # Local virtual environment (not committed)
+  39 | 
+  40 | yaml
+  41 | Copy code
+  42 | 
+  43 | ---
+  44 | 
+  45 | ## Prerequisites
+  46 | 
+  47 | Ensure the following are installed on your system:
+  48 | 
+  49 | - Python **3.12+**
+  50 | - Git
+  51 | 
+  52 | Verify:
+  53 | 
+  54 | ```bash
+  55 | python3 --version
+  56 | git --version
+  57 | How to Run the Backend (Step-by-Step, No Assumptions)
+  58 | 1. Clone the Repository
+  59 | bash
+  60 | Copy code
+  61 | git clone https://github.com/rajeshdumpeti/vidyatrack-backend.git
+  62 | cd vidyatrack-backend
+  63 | 2. Create and Activate Virtual Environment
+  64 | Important: Never run the backend without a virtual environment.
+  65 | 
+  66 | bash
+  67 | Copy code
+  68 | python3 -m venv .venv
+  69 | source .venv/bin/activate
+  70 | Verify activation:
+  71 | 
+  72 | bash
+  73 | Copy code
+  74 | which python
+  75 | Expected output:
+  76 | 
+  77 | bash
+  78 | Copy code
+  79 | .../vidyatrack-backend/.venv/bin/python
+  80 | If this is wrong → STOP. Fix the virtual environment before continuing.
+  81 | 
+  82 | 3. Install Dependencies
+  83 | bash
+  84 | Copy code
+  85 | pip install -r requirements.txt
+  86 | Verify FastAPI installation:
+  87 | 
+  88 | bash
+  89 | Copy code
+  90 | python -c "import fastapi; print(fastapi.__version__)"
+  91 | 4. Run the Backend Server
+  92 | bash
+  93 | Copy code
+  94 | uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+  95 | Expected output:
+  96 | 
+  97 | nginx
+  98 | Copy code
+  99 | Uvicorn running on http://127.0.0.1:8000
+ 100 | Application startup complete.
+ 101 | 5. Verify Health Endpoints
+ 102 | Liveness
+ 103 | bash
+ 104 | Copy code
+ 105 | curl http://127.0.0.1:8000/api/v1/health/live
+ 106 | Readiness
+ 107 | bash
+ 108 | Copy code
+ 109 | curl http://127.0.0.1:8000/api/v1/health/ready
+ 110 | Expected response:
+ 111 | 
+ 112 | json
+ 113 | Copy code
+ 114 | { "status": "ok" }
+ 115 | If these fail → the backend is not healthy.
+ 116 | 
+ 117 | 🧪 Postman Usage (Local Development)
+ 118 | Collection
+ 119 | Name: vidyatrack-backend
+ 120 | 
+ 121 | Environment
+ 122 | Name: vidyatrack-local
+ 123 | 
+ 124 | Variable	Value
+ 125 | base_url	http://127.0.0.1:8000
+ 126 | 
+ 127 | Requests
+ 128 | text
+ 129 | Copy code
+ 130 | GET {{base_url}}/api/v1/health/live
+ 131 | GET {{base_url}}/api/v1/health/ready
+ 132 | 🧯 Troubleshooting Guide (Read This Before Panicking)
+ 133 | ❌ ModuleNotFoundError: No module named app
+ 134 | Cause:
+ 135 | Running uvicorn from the wrong directory.
+ 136 | 
+ 137 | Fix:
+ 138 | 
+ 139 | bash
+ 140 | Copy code
+ 141 | cd vidyatrack-backend
+ 142 | uvicorn app.main:app --reload
+ 143 | ❌ Address already in use
+ 144 | Cause:
+ 145 | Port 8000 is already occupied.
+ 146 | 
+ 147 | Fix:
+ 148 | 
+ 149 | bash
+ 150 | Copy code
+ 151 | lsof -i :8000
+ 152 | kill -9 <PID>
+ 153 | OR run on another port:
+ 154 | 
+ 155 | bash
+ 156 | Copy code
+ 157 | uvicorn app.main:app --port 8001
+ 158 | ❌ command not found: uvicorn
+ 159 | Cause:
+ 160 | Virtual environment not activated.
+ 161 | 
+ 162 | Fix:
+ 163 | 
+ 164 | bash
+ 165 | Copy code
+ 166 | source .venv/bin/activate
+ 167 | pip install -r requirements.txt
+ 168 | ❌ Health endpoint returns 404
+ 169 | Cause:
+ 170 | Wrong URL or missing /api/v1.
+ 171 | 
+ 172 | Correct URLs:
+ 173 | 
+ 174 | bash
+ 175 | Copy code
+ 176 | /api/v1/health/live
+ 177 | /api/v1/health/ready
+ 178 | ❌ Code changes not reflecting
+ 179 | Cause:
+ 180 | Server not started with --reload.
+ 181 | 
+ 182 | Fix:
+ 183 | 
+ 184 | bash
+ 185 | Copy code
+ 186 | uvicorn app.main:app --reload
+ 187 | 🔄 Git Workflow (Expected)
+ 188 | Default branch: main
+ 189 | 
+ 190 | Commit conventions
+ 191 | feat: → new functionality
+ 192 | 
+ 193 | docs: → documentation
+ 194 | 
+ 195 | chore: → setup / tooling
+ 196 | 
+ 197 | Do NOT commit
+ 198 | .venv/
+ 199 | 
+ 200 | .env
+ 201 | 
+ 202 | local cache files
+ 203 | 
+ 204 | 🧱 Architectural Notes (Why Things Are This Way)
+ 205 | Versioned APIs (/api/v1)
+ 206 | Prevents breaking clients when APIs evolve.
+ 207 | 
+ 208 | Routes separated by domain
+ 209 | Avoids god-files and keeps ownership clear.
+ 210 | 
+ 211 | Health endpoints split (live vs ready)
+ 212 | Required for real deployments (Docker, Kubernetes, ECS).
+ 213 | 
+ 214 | 🚦 Current Scope vs Future Scope
+ 215 | Implemented
+ 216 | Health checks
+ 217 | 
+ 218 | API versioning
+ 219 | 
+ 220 | Clean project structure
+ 221 | 
+ 222 | Planned
+ 223 | Configuration management (core/config.py)
+ 224 | 
+ 225 | Logging middleware
+ 226 | 
+ 227 | SQLAlchemy + Alembic
+ 228 | 
+ 229 | Authentication & RBAC
+ 230 | 
+ 231 | Domain modules (schools, users, attendance)
+ 232 | 
+ 233 | 📌 Operational Rule (Important)
+ 234 | If health endpoints are green, the backend is considered:
+ 235 | 
+ 236 | runnable
+ 237 | 
+ 238 | deployable
+ 239 | 
+ 240 | safe to extend
+ 241 | 
+ 242 | If health endpoints fail → do not proceed with feature work.
+ 243 | 
+ 244 | yaml
+ 245 | Copy code
+ 246 | 
+ 247 | ---
+ 248 | 
+ 249 | ### Mentor verdict (straight talk)
+ 250 | 
+ 251 | This README is **not beginner junk**.
+ 252 | It’s something a **senior engineer or DevOps person can actually operate from**.
+ 253 | 
+ 254 | If you want, next we can:
+ 255 | - add **CONTRIBUTING.md**
+ 256 | - add **release versioning (`v0.1.0`)**
+ 257 | - or move into **config + logging foundation**
+ 258 | 
+ 259 | You decide the next step.
+ 260 | ```
+ 261 | 
+ 262 | <!-- Precees to create API for this project -->
+ 263 | 
+ 264 | Create file in modals first and schema
+ 265 | import in modals/**init**.py
+ 266 | then run -- below two lines
+ 267 | alembic revision --autogenerate -m "create classes and sections tables"
+ 268 | alembic upgrade head
+ 269 | which creates file in alembic/versions example: d424429bc79d_create_classes_and_sections_tables.py
+ 270 | Then create new file example : app/api/v1/routes/classes.py
+ 271 | then add from app.api.v1.routes import classes in app/api/v1/router.py and include api_router.include_router(classes.router) in same file
+ 272 | test create api's in postman
+
+/alembic/versions/03c5a6fc07ad_create_students_table.py:
+--------------------------------------------------------------------------------
+   1 | """create students table
+   2 | 
+   3 | Revision ID: 03c5a6fc07ad
+   4 | Revises: ba38c093650b
+   5 | Create Date: 2025-12-25 02:31:49.344628
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '03c5a6fc07ad'
+  16 | down_revision: Union[str, None] = 'ba38c093650b'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('students',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  26 |     sa.Column('name', sa.String(length=255), nullable=False),
+  27 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  28 |     sa.PrimaryKeyConstraint('id')
+  29 |     )
+  30 |     op.create_index(op.f('ix_students_id'), 'students', ['id'], unique=False)
+  31 |     op.create_index(op.f('ix_students_school_id'), 'students', ['school_id'], unique=False)
+  32 |     # ### end Alembic commands ###
+  33 | 
+  34 | 
+  35 | def downgrade() -> None:
+  36 |     # ### commands auto generated by Alembic - please adjust! ###
+  37 |     op.drop_index(op.f('ix_students_school_id'), table_name='students')
+  38 |     op.drop_index(op.f('ix_students_id'), table_name='students')
+  39 |     op.drop_table('students')
+  40 |     # ### end Alembic commands ###
+
+/alembic/versions/0cfca8bbc912_.py:
+--------------------------------------------------------------------------------
+   1 | """empty message
+   2 | 
+   3 | Revision ID: 0cfca8bbc912
+   4 | Revises: 884c8272fdc6
+   5 | Create Date: 2026-01-10 14:56:18.985610
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '0cfca8bbc912'
+  16 | down_revision: Union[str, None] = '884c8272fdc6'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.drop_constraint('uq_teachers_user_id', 'teachers', type_='unique')
+  24 |     op.drop_constraint('fk_teachers_user_id', 'teachers', type_='foreignkey')
+  25 |     op.drop_column('teachers', 'user_id')
+  26 |     # ### end Alembic commands ###
+  27 | 
+  28 | 
+  29 | def downgrade() -> None:
+  30 |     # ### commands auto generated by Alembic - please adjust! ###
+  31 |     op.add_column('teachers', sa.Column(
+  32 |         'user_id', sa.INTEGER(), autoincrement=False, nullable=True))
+  33 |     op.create_foreign_key('fk_teachers_user_id', 'teachers', 'users', [
+  34 |                           'user_id'], ['id'], ondelete='CASCADE')
+  35 |     op.create_unique_constraint('uq_teachers_user_id', 'teachers', ['user_id'])
+  36 |     # ### end Alembic commands ###
+
+/alembic/versions/4d1b0b81d2b9_add_student_parent_contact_and_section.py:
+--------------------------------------------------------------------------------
+   1 | """add student parent contact and section
+   2 | 
+   3 | Revision ID: 4d1b0b81d2b9
+   4 | Revises: c869ac6dbcd3
+   5 | Create Date: 2025-12-29 16:13:28.171712
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '4d1b0b81d2b9'
+  16 | down_revision: Union[str, None] = 'c869ac6dbcd3'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # 1. Add columns as nullable first
+  23 |     op.add_column(
+  24 |         "students",
+  25 |         sa.Column("parent_phone", sa.String(length=32), nullable=True),
+  26 |     )
+  27 |     op.add_column(
+  28 |         "students",
+  29 |         sa.Column("parent_name", sa.String(length=255), nullable=True),
+  30 |     )
+  31 | 
+  32 |     # 2. Backfill parent_phone for existing rows (pilot-safe default)
+  33 |     op.execute(
+  34 |         "UPDATE students SET parent_phone = '1000000000' WHERE parent_phone IS NULL"
+  35 |     )
+  36 | 
+  37 |     # 3. Enforce NOT NULL after data is safe
+  38 |     op.alter_column(
+  39 |         "students",
+  40 |         "parent_phone",
+  41 |         nullable=False,
+  42 |     )
+  43 | 
+  44 | 
+  45 | def downgrade() -> None:
+  46 |     # ### commands auto generated by Alembic - please adjust! ###
+  47 |     op.add_column('students', sa.Column(
+  48 |         'school_id', sa.INTEGER(), autoincrement=False, nullable=False))
+  49 |     op.drop_constraint(None, 'students', type_='foreignkey')
+  50 |     op.create_foreign_key('students_school_id_fkey', 'students', 'schools', [
+  51 |                           'school_id'], ['id'], ondelete='CASCADE')
+  52 |     op.drop_index(op.f('ix_students_section_id'), table_name='students')
+  53 |     op.create_index('ix_students_school_id', 'students',
+  54 |                     ['school_id'], unique=False)
+  55 |     op.drop_column('students', 'parent_name')
+  56 |     op.drop_column('students', 'parent_phone')
+  57 |     op.drop_column('students', 'section_id')
+  58 |     # ### end Alembic commands ###
+
+/alembic/versions/61421bb28be5_add_email_to_users.py:
+--------------------------------------------------------------------------------
+   1 | """add email to users
+   2 | 
+   3 | Revision ID: 61421bb28be5
+   4 | Revises: c4b1f0a1b2cd
+   5 | Create Date: 2026-01-15 00:46:09.979610
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '61421bb28be5'
+  16 | down_revision: Union[str, None] = 'c4b1f0a1b2cd'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     op.add_column("users", sa.Column(
+  23 |         "email", sa.String(length=255), nullable=True))
+  24 |     op.create_index("ix_users_email", "users", ["email"])
+  25 | 
+  26 |     # Optional but recommended for idempotency safety:
+  27 |     # unique per school when email is present (partial unique index)
+  28 |     op.create_index(
+  29 |         "uq_users_school_email",
+  30 |         "users",
+  31 |         ["school_id", "email"],
+  32 |         unique=True,
+  33 |         postgresql_where=sa.text("email IS NOT NULL"),
+  34 |     )
+  35 | 
+  36 | 
+  37 | def downgrade() -> None:
+  38 |     op.drop_index("uq_users_school_email", table_name="users")
+  39 |     op.drop_index("ix_users_email", table_name="users")
+  40 |     op.drop_column("users", "email")
+
+/alembic/versions/72c57d77456d_create_marks_records_and_submissions_.py:
+--------------------------------------------------------------------------------
+   1 | """create marks records and submissions tables
+   2 | 
+   3 | Revision ID: 72c57d77456d
+   4 | Revises: 79132501e241
+   5 | Create Date: 2025-12-29 15:12:15.730587
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '72c57d77456d'
+  16 | down_revision: Union[str, None] = '79132501e241'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('marks_records',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  26 |     sa.Column('student_id', sa.Integer(), nullable=False),
+  27 |     sa.Column('subject_id', sa.Integer(), nullable=False),
+  28 |     sa.Column('exam_type', sa.String(length=32), nullable=False),
+  29 |     sa.Column('marks_obtained', sa.Integer(), nullable=False),
+  30 |     sa.Column('max_marks', sa.Integer(), nullable=False),
+  31 |     sa.Column('recorded_by_user_id', sa.Integer(), nullable=True),
+  32 |     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+  33 |     sa.ForeignKeyConstraint(['recorded_by_user_id'], ['users.id'], ondelete='SET NULL'),
+  34 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  35 |     sa.ForeignKeyConstraint(['student_id'], ['students.id'], ondelete='CASCADE'),
+  36 |     sa.ForeignKeyConstraint(['subject_id'], ['subjects.id'], ondelete='CASCADE'),
+  37 |     sa.PrimaryKeyConstraint('id'),
+  38 |     sa.UniqueConstraint('school_id', 'student_id', 'subject_id', 'exam_type', name='uq_marks_school_student_subject_exam')
+  39 |     )
+  40 |     op.create_index(op.f('ix_marks_records_exam_type'), 'marks_records', ['exam_type'], unique=False)
+  41 |     op.create_index(op.f('ix_marks_records_id'), 'marks_records', ['id'], unique=False)
+  42 |     op.create_index(op.f('ix_marks_records_recorded_by_user_id'), 'marks_records', ['recorded_by_user_id'], unique=False)
+  43 |     op.create_index(op.f('ix_marks_records_school_id'), 'marks_records', ['school_id'], unique=False)
+  44 |     op.create_index(op.f('ix_marks_records_student_id'), 'marks_records', ['student_id'], unique=False)
+  45 |     op.create_index(op.f('ix_marks_records_subject_id'), 'marks_records', ['subject_id'], unique=False)
+  46 |     op.create_table('marks_submissions',
+  47 |     sa.Column('id', sa.Integer(), nullable=False),
+  48 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  49 |     sa.Column('section_id', sa.Integer(), nullable=False),
+  50 |     sa.Column('subject_id', sa.Integer(), nullable=False),
+  51 |     sa.Column('exam_type', sa.String(length=32), nullable=False),
+  52 |     sa.Column('submitted_by_user_id', sa.Integer(), nullable=True),
+  53 |     sa.Column('status', sa.String(length=32), nullable=False),
+  54 |     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+  55 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  56 |     sa.ForeignKeyConstraint(['section_id'], ['sections.id'], ondelete='CASCADE'),
+  57 |     sa.ForeignKeyConstraint(['subject_id'], ['subjects.id'], ondelete='CASCADE'),
+  58 |     sa.ForeignKeyConstraint(['submitted_by_user_id'], ['users.id'], ondelete='SET NULL'),
+  59 |     sa.PrimaryKeyConstraint('id'),
+  60 |     sa.UniqueConstraint('school_id', 'section_id', 'subject_id', 'exam_type', name='uq_marks_sub_school_section_subject_exam')
+  61 |     )
+  62 |     op.create_index(op.f('ix_marks_submissions_exam_type'), 'marks_submissions', ['exam_type'], unique=False)
+  63 |     op.create_index(op.f('ix_marks_submissions_id'), 'marks_submissions', ['id'], unique=False)
+  64 |     op.create_index(op.f('ix_marks_submissions_school_id'), 'marks_submissions', ['school_id'], unique=False)
+  65 |     op.create_index(op.f('ix_marks_submissions_section_id'), 'marks_submissions', ['section_id'], unique=False)
+  66 |     op.create_index(op.f('ix_marks_submissions_subject_id'), 'marks_submissions', ['subject_id'], unique=False)
+  67 |     op.create_index(op.f('ix_marks_submissions_submitted_by_user_id'), 'marks_submissions', ['submitted_by_user_id'], unique=False)
+  68 |     # ### end Alembic commands ###
+  69 | 
+  70 | 
+  71 | def downgrade() -> None:
+  72 |     # ### commands auto generated by Alembic - please adjust! ###
+  73 |     op.drop_index(op.f('ix_marks_submissions_submitted_by_user_id'), table_name='marks_submissions')
+  74 |     op.drop_index(op.f('ix_marks_submissions_subject_id'), table_name='marks_submissions')
+  75 |     op.drop_index(op.f('ix_marks_submissions_section_id'), table_name='marks_submissions')
+  76 |     op.drop_index(op.f('ix_marks_submissions_school_id'), table_name='marks_submissions')
+  77 |     op.drop_index(op.f('ix_marks_submissions_id'), table_name='marks_submissions')
+  78 |     op.drop_index(op.f('ix_marks_submissions_exam_type'), table_name='marks_submissions')
+  79 |     op.drop_table('marks_submissions')
+  80 |     op.drop_index(op.f('ix_marks_records_subject_id'), table_name='marks_records')
+  81 |     op.drop_index(op.f('ix_marks_records_student_id'), table_name='marks_records')
+  82 |     op.drop_index(op.f('ix_marks_records_school_id'), table_name='marks_records')
+  83 |     op.drop_index(op.f('ix_marks_records_recorded_by_user_id'), table_name='marks_records')
+  84 |     op.drop_index(op.f('ix_marks_records_id'), table_name='marks_records')
+  85 |     op.drop_index(op.f('ix_marks_records_exam_type'), table_name='marks_records')
+  86 |     op.drop_table('marks_records')
+  87 |     # ### end Alembic commands ###
+
+/alembic/versions/74a8ce865c18_create_teachers_table.py:
+--------------------------------------------------------------------------------
+   1 | """create teachers table
+   2 | 
+   3 | Revision ID: 74a8ce865c18
+   4 | Revises: 9d586b755c7a
+   5 | Create Date: 2025-12-24 21:07:25.656054
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '74a8ce865c18'
+  16 | down_revision: Union[str, None] = '9d586b755c7a'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('teachers',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  26 |     sa.Column('name', sa.String(length=200), nullable=False),
+  27 |     sa.Column('email', sa.String(length=255), nullable=True),
+  28 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  29 |     sa.PrimaryKeyConstraint('id')
+  30 |     )
+  31 |     op.create_index(op.f('ix_teachers_id'), 'teachers', ['id'], unique=False)
+  32 |     op.create_index(op.f('ix_teachers_school_id'), 'teachers', ['school_id'], unique=False)
+  33 |     # ### end Alembic commands ###
+  34 | 
+  35 | 
+  36 | def downgrade() -> None:
+  37 |     # ### commands auto generated by Alembic - please adjust! ###
+  38 |     op.drop_index(op.f('ix_teachers_school_id'), table_name='teachers')
+  39 |     op.drop_index(op.f('ix_teachers_id'), table_name='teachers')
+  40 |     op.drop_table('teachers')
+  41 |     # ### end Alembic commands ###
+
+/alembic/versions/75b912a27845_add_attendance_submissions_and_.py:
+--------------------------------------------------------------------------------
+   1 | """add attendance submissions and notification outbox
+   2 | 
+   3 | Revision ID: 75b912a27845
+   4 | Revises: a7fd0e240560
+   5 | Create Date: 2025-12-29 13:46:20.960131
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '75b912a27845'
+  16 | down_revision: Union[str, None] = 'a7fd0e240560'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('attendance_submissions',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  26 |     sa.Column('section_id', sa.Integer(), nullable=False),
+  27 |     sa.Column('date', sa.Date(), nullable=False),
+  28 |     sa.Column('submitted_by_user_id', sa.Integer(), nullable=True),
+  29 |     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+  30 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  31 |     sa.ForeignKeyConstraint(['section_id'], ['sections.id'], ondelete='CASCADE'),
+  32 |     sa.ForeignKeyConstraint(['submitted_by_user_id'], ['users.id'], ondelete='SET NULL'),
+  33 |     sa.PrimaryKeyConstraint('id'),
+  34 |     sa.UniqueConstraint('school_id', 'section_id', 'date', name='uq_att_sub_school_section_date')
+  35 |     )
+  36 |     op.create_index(op.f('ix_attendance_submissions_date'), 'attendance_submissions', ['date'], unique=False)
+  37 |     op.create_index(op.f('ix_attendance_submissions_id'), 'attendance_submissions', ['id'], unique=False)
+  38 |     op.create_index(op.f('ix_attendance_submissions_school_id'), 'attendance_submissions', ['school_id'], unique=False)
+  39 |     op.create_index(op.f('ix_attendance_submissions_section_id'), 'attendance_submissions', ['section_id'], unique=False)
+  40 |     op.create_index(op.f('ix_attendance_submissions_submitted_by_user_id'), 'attendance_submissions', ['submitted_by_user_id'], unique=False)
+  41 |     op.create_table('notification_outbox',
+  42 |     sa.Column('id', sa.Integer(), nullable=False),
+  43 |     sa.Column('submission_id', sa.Integer(), nullable=False),
+  44 |     sa.Column('student_id', sa.Integer(), nullable=False),
+  45 |     sa.Column('channel', sa.String(length=32), nullable=False),
+  46 |     sa.Column('status', sa.String(length=32), nullable=False),
+  47 |     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+  48 |     sa.ForeignKeyConstraint(['student_id'], ['students.id'], ondelete='CASCADE'),
+  49 |     sa.ForeignKeyConstraint(['submission_id'], ['attendance_submissions.id'], ondelete='CASCADE'),
+  50 |     sa.PrimaryKeyConstraint('id'),
+  51 |     sa.UniqueConstraint('submission_id', 'student_id', 'channel', name='uq_outbox_submission_student_channel')
+  52 |     )
+  53 |     op.create_index(op.f('ix_notification_outbox_id'), 'notification_outbox', ['id'], unique=False)
+  54 |     op.create_index(op.f('ix_notification_outbox_student_id'), 'notification_outbox', ['student_id'], unique=False)
+  55 |     op.create_index(op.f('ix_notification_outbox_submission_id'), 'notification_outbox', ['submission_id'], unique=False)
+  56 |     # ### end Alembic commands ###
+  57 | 
+  58 | 
+  59 | def downgrade() -> None:
+  60 |     # ### commands auto generated by Alembic - please adjust! ###
+  61 |     op.drop_index(op.f('ix_notification_outbox_submission_id'), table_name='notification_outbox')
+  62 |     op.drop_index(op.f('ix_notification_outbox_student_id'), table_name='notification_outbox')
+  63 |     op.drop_index(op.f('ix_notification_outbox_id'), table_name='notification_outbox')
+  64 |     op.drop_table('notification_outbox')
+  65 |     op.drop_index(op.f('ix_attendance_submissions_submitted_by_user_id'), table_name='attendance_submissions')
+  66 |     op.drop_index(op.f('ix_attendance_submissions_section_id'), table_name='attendance_submissions')
+  67 |     op.drop_index(op.f('ix_attendance_submissions_school_id'), table_name='attendance_submissions')
+  68 |     op.drop_index(op.f('ix_attendance_submissions_id'), table_name='attendance_submissions')
+  69 |     op.drop_index(op.f('ix_attendance_submissions_date'), table_name='attendance_submissions')
+  70 |     op.drop_table('attendance_submissions')
+  71 |     # ### end Alembic commands ###
+
+/alembic/versions/76e77b2d85a9_add_email_to_users.py:
+--------------------------------------------------------------------------------
+   1 | """add email to users
+   2 | 
+   3 | Revision ID: 76e77b2d85a9
+   4 | Revises: 61421bb28be5
+   5 | Create Date: 2026-01-15 00:56:26.922750
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '76e77b2d85a9'
+  16 | down_revision: Union[str, None] = '61421bb28be5'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     pass
+  23 | 
+  24 | 
+  25 | def downgrade() -> None:
+  26 |     pass
+
+/alembic/versions/79132501e241_create_subjects_table.py:
+--------------------------------------------------------------------------------
+   1 | """create subjects table
+   2 | 
+   3 | Revision ID: 79132501e241
+   4 | Revises: 75b912a27845
+   5 | Create Date: 2025-12-29 14:56:39.095634
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '79132501e241'
+  16 | down_revision: Union[str, None] = '75b912a27845'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('subjects',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  26 |     sa.Column('name', sa.String(length=255), nullable=False),
+  27 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  28 |     sa.PrimaryKeyConstraint('id')
+  29 |     )
+  30 |     op.create_index(op.f('ix_subjects_id'), 'subjects', ['id'], unique=False)
+  31 |     op.create_index(op.f('ix_subjects_school_id'), 'subjects', ['school_id'], unique=False)
+  32 |     # ### end Alembic commands ###
+  33 | 
+  34 | 
+  35 | def downgrade() -> None:
+  36 |     # ### commands auto generated by Alembic - please adjust! ###
+  37 |     op.drop_index(op.f('ix_subjects_school_id'), table_name='subjects')
+  38 |     op.drop_index(op.f('ix_subjects_id'), table_name='subjects')
+  39 |     op.drop_table('subjects')
+  40 |     # ### end Alembic commands ###
+
+/alembic/versions/860e577da006_create_principals_table.py:
+--------------------------------------------------------------------------------
+   1 | """create principals table
+   2 | 
+   3 | Revision ID: 860e577da006
+   4 | Revises: 76e77b2d85a9
+   5 | Create Date: 2026-01-16 01:13:41.423706
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '860e577da006'
+  16 | down_revision: Union[str, None] = '76e77b2d85a9'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     op.create_table(
+  23 |         "principals",
+  24 |         sa.Column("id", sa.Integer(), primary_key=True),
+  25 |         sa.Column(
+  26 |             "school_id",
+  27 |             sa.Integer(),
+  28 |             sa.ForeignKey("schools.id", ondelete="CASCADE"),
+  29 |             nullable=False,
+  30 |         ),
+  31 |         sa.Column(
+  32 |             "user_id",
+  33 |             sa.Integer(),
+  34 |             sa.ForeignKey("users.id", ondelete="RESTRICT"),
+  35 |             nullable=False,
+  36 |         ),
+  37 |         sa.Column("name", sa.String(length=200), nullable=False),
+  38 |         sa.Column(
+  39 |             "created_at",
+  40 |             sa.DateTime(timezone=True),
+  41 |             server_default=sa.text("now()"),
+  42 |             nullable=False,
+  43 |         ),
+  44 |     )
+  45 | 
+  46 |     # Exactly ONE principal per school
+  47 |     op.create_unique_constraint(
+  48 |         "uq_principals_school_id",
+  49 |         "principals",
+  50 |         ["school_id"],
+  51 |     )
+  52 | 
+  53 |     # Optional but recommended: one principal per user
+  54 |     op.create_unique_constraint(
+  55 |         "uq_principals_user_id",
+  56 |         "principals",
+  57 |         ["user_id"],
+  58 |     )
+  59 | 
+  60 |     op.create_index(
+  61 |         "ix_principals_school_id",
+  62 |         "principals",
+  63 |         ["school_id"],
+  64 |     )
+  65 | 
+  66 | 
+  67 | def downgrade() -> None:
+  68 |     op.drop_index("ix_principals_school_id", table_name="principals")
+  69 |     op.drop_constraint("uq_principals_user_id", "principals", type_="unique")
+  70 |     op.drop_constraint("uq_principals_school_id", "principals", type_="unique")
+  71 |     op.drop_table("principals")
+
+/alembic/versions/884c8272fdc6_add_outbox_next_attempt_at.py:
+--------------------------------------------------------------------------------
+   1 | """add outbox next_attempt_at
+   2 | 
+   3 | Revision ID: 884c8272fdc6
+   4 | Revises: 9ece9554bba5
+   5 | Create Date: 2025-12-29 17:47:42.037532
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '884c8272fdc6'
+  16 | down_revision: Union[str, None] = '9ece9554bba5'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     op.create_index(
+  23 |         "uq_outbox_attendance_event_submission_recipient",
+  24 |         "notification_outbox",
+  25 |         ["event_type", "attendance_submission_id", "recipient_phone"],
+  26 |         unique=True,
+  27 |         postgresql_where=sa.text("attendance_submission_id IS NOT NULL"),
+  28 |     )
+  29 | 
+  30 |     op.create_index(
+  31 |         "uq_outbox_marks_event_submission_recipient",
+  32 |         "notification_outbox",
+  33 |         ["event_type", "marks_submission_id", "recipient_phone"],
+  34 |         unique=True,
+  35 |         postgresql_where=sa.text("marks_submission_id IS NOT NULL"),
+  36 |     )
+  37 | 
+  38 | 
+  39 | def downgrade() -> None:
+  40 |     op.drop_index("uq_outbox_marks_event_submission_recipient",
+  41 |                   table_name="notification_outbox")
+  42 |     op.drop_index("uq_outbox_attendance_event_submission_recipient",
+  43 |                   table_name="notification_outbox")
+
+/alembic/versions/9d586b755c7a_create_schools.py:
+--------------------------------------------------------------------------------
+   1 | """create schools
+   2 | 
+   3 | Revision ID: 9d586b755c7a
+   4 | Revises: eeebd7c393ce
+   5 | Create Date: 2025-12-24 18:42:09.866767
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '9d586b755c7a'
+  16 | down_revision: Union[str, None] = 'eeebd7c393ce'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('schools',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('name', sa.String(length=255), nullable=False),
+  26 |     sa.PrimaryKeyConstraint('id')
+  27 |     )
+  28 |     # ### end Alembic commands ###
+  29 | 
+  30 | 
+  31 | def downgrade() -> None:
+  32 |     # ### commands auto generated by Alembic - please adjust! ###
+  33 |     op.drop_table('schools')
+  34 |     # ### end Alembic commands ###
+
+/alembic/versions/9ece9554bba5_add_students_section_id.py:
+--------------------------------------------------------------------------------
+   1 | """add students section_id
+   2 | 
+   3 | Revision ID: 9ece9554bba5
+   4 | Revises: 4d1b0b81d2b9
+   5 | Create Date: 2025-12-29 16:56:29.001995
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = '9ece9554bba5'
+  16 | down_revision: Union[str, None] = '4d1b0b81d2b9'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     op.add_column(
+  23 |         "students",
+  24 |         sa.Column("section_id", sa.Integer(), nullable=True),
+  25 |     )
+  26 |     op.create_foreign_key(
+  27 |         "fk_students_section_id_sections",
+  28 |         "students",
+  29 |         "sections",
+  30 |         ["section_id"],
+  31 |         ["id"],
+  32 |         ondelete="SET NULL",
+  33 |     )
+  34 |     op.create_index(
+  35 |         "ix_students_section_id",
+  36 |         "students",
+  37 |         ["section_id"],
+  38 |         unique=False,
+  39 |     )
+  40 | 
+  41 | 
+  42 | def downgrade() -> None:
+  43 |     op.drop_index("ix_students_section_id", table_name="students")
+  44 |     op.drop_constraint("fk_students_section_id_sections",
+  45 |                        "students", type_="foreignkey")
+  46 |     op.drop_column("students", "section_id")
+
+/alembic/versions/a7fd0e240560_add_attendance_indexes.py:
+--------------------------------------------------------------------------------
+   1 | """add attendance indexes
+   2 | 
+   3 | Revision ID: a7fd0e240560
+   4 | Revises: e0154ef0f1a9
+   5 | Create Date: 2025-12-29 13:42:49.626153
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'a7fd0e240560'
+  16 | down_revision: Union[str, None] = 'e0154ef0f1a9'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     op.create_index("ix_attendance_school_date", "attendance_records", [
+  23 |                     "school_id", "date"], unique=False)
+  24 |     op.create_index("ix_attendance_school_student", "attendance_records", [
+  25 |         "school_id", "student_id"], unique=False)
+  26 | 
+  27 | 
+  28 | def downgrade() -> None:
+  29 |     op.drop_index("ix_attendance_school_student",
+  30 |                   table_name="attendance_records")
+  31 |     op.drop_index("ix_attendance_school_date", table_name="attendance_records")
+
+/alembic/versions/b81809ab7aaf_create_section_subject_teachers_table.py:
+--------------------------------------------------------------------------------
+   1 | """create section_subject_teachers table
+   2 | 
+   3 | Revision ID: b81809ab7aaf
+   4 | Revises: f7a2fa09402b
+   5 | Create Date: 2026-01-13 02:22:33.315385
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | from sqlalchemy.dialects import postgresql
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'b81809ab7aaf'
+  16 | down_revision: Union[str, None] = 'f7a2fa09402b'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('section_subject_teachers',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  26 |     sa.Column('section_id', sa.Integer(), nullable=False),
+  27 |     sa.Column('subject_id', sa.Integer(), nullable=False),
+  28 |     sa.Column('teacher_id', sa.Integer(), nullable=False),
+  29 |     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+  30 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  31 |     sa.ForeignKeyConstraint(['section_id'], ['sections.id'], ondelete='CASCADE'),
+  32 |     sa.ForeignKeyConstraint(['subject_id'], ['subjects.id'], ondelete='CASCADE'),
+  33 |     sa.ForeignKeyConstraint(['teacher_id'], ['teachers.id'], ondelete='CASCADE'),
+  34 |     sa.PrimaryKeyConstraint('id'),
+  35 |     sa.UniqueConstraint('school_id', 'section_id', 'subject_id', name='uq_sst_school_section_subject')
+  36 |     )
+  37 |     op.create_index(op.f('ix_section_subject_teachers_id'), 'section_subject_teachers', ['id'], unique=False)
+  38 |     op.create_index(op.f('ix_section_subject_teachers_school_id'), 'section_subject_teachers', ['school_id'], unique=False)
+  39 |     op.create_index(op.f('ix_section_subject_teachers_section_id'), 'section_subject_teachers', ['section_id'], unique=False)
+  40 |     op.create_index(op.f('ix_section_subject_teachers_subject_id'), 'section_subject_teachers', ['subject_id'], unique=False)
+  41 |     op.create_index(op.f('ix_section_subject_teachers_teacher_id'), 'section_subject_teachers', ['teacher_id'], unique=False)
+  42 |     op.create_index('ix_sst_school_section', 'section_subject_teachers', ['school_id', 'section_id'], unique=False)
+  43 |     op.create_index('ix_sst_school_teacher', 'section_subject_teachers', ['school_id', 'teacher_id'], unique=False)
+  44 |     op.drop_index('ix_student_notes_school_student', table_name='student_notes')
+  45 |     op.drop_table('student_notes')
+  46 |     # ### end Alembic commands ###
+  47 | 
+  48 | 
+  49 | def downgrade() -> None:
+  50 |     # ### commands auto generated by Alembic - please adjust! ###
+  51 |     op.create_table('student_notes',
+  52 |     sa.Column('id', sa.INTEGER(), autoincrement=True, nullable=False),
+  53 |     sa.Column('school_id', sa.INTEGER(), autoincrement=False, nullable=False),
+  54 |     sa.Column('student_id', sa.INTEGER(), autoincrement=False, nullable=False),
+  55 |     sa.Column('author_user_id', sa.INTEGER(), autoincrement=False, nullable=True),
+  56 |     sa.Column('note_text', sa.TEXT(), autoincrement=False, nullable=False),
+  57 |     sa.Column('created_at', postgresql.TIMESTAMP(timezone=True), server_default=sa.text('now()'), autoincrement=False, nullable=False),
+  58 |     sa.ForeignKeyConstraint(['author_user_id'], ['users.id'], name='student_notes_author_user_id_fkey', ondelete='SET NULL'),
+  59 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], name='student_notes_school_id_fkey', ondelete='CASCADE'),
+  60 |     sa.ForeignKeyConstraint(['student_id'], ['students.id'], name='student_notes_student_id_fkey', ondelete='CASCADE'),
+  61 |     sa.PrimaryKeyConstraint('id', name='student_notes_pkey')
+  62 |     )
+  63 |     op.create_index('ix_student_notes_school_student', 'student_notes', ['school_id', 'student_id'], unique=False)
+  64 |     op.drop_index('ix_sst_school_teacher', table_name='section_subject_teachers')
+  65 |     op.drop_index('ix_sst_school_section', table_name='section_subject_teachers')
+  66 |     op.drop_index(op.f('ix_section_subject_teachers_teacher_id'), table_name='section_subject_teachers')
+  67 |     op.drop_index(op.f('ix_section_subject_teachers_subject_id'), table_name='section_subject_teachers')
+  68 |     op.drop_index(op.f('ix_section_subject_teachers_section_id'), table_name='section_subject_teachers')
+  69 |     op.drop_index(op.f('ix_section_subject_teachers_school_id'), table_name='section_subject_teachers')
+  70 |     op.drop_index(op.f('ix_section_subject_teachers_id'), table_name='section_subject_teachers')
+  71 |     op.drop_table('section_subject_teachers')
+  72 |     # ### end Alembic commands ###
+
+/alembic/versions/ba38c093650b_create_users_and_otp_requests_tables.py:
+--------------------------------------------------------------------------------
+   1 | """create users and otp_requests tables
+   2 | 
+   3 | Revision ID: ba38c093650b
+   4 | Revises: 74a8ce865c18
+   5 | Create Date: 2025-12-24 21:48:13.753572
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'ba38c093650b'
+  16 | down_revision: Union[str, None] = '74a8ce865c18'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('otp_requests',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('phone', sa.String(length=20), nullable=False),
+  26 |     sa.Column('otp_hash', sa.String(length=255), nullable=False),
+  27 |     sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
+  28 |     sa.Column('attempt_count', sa.Integer(), nullable=False),
+  29 |     sa.Column('consumed_at', sa.DateTime(timezone=True), nullable=True),
+  30 |     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+  31 |     sa.PrimaryKeyConstraint('id')
+  32 |     )
+  33 |     op.create_index(op.f('ix_otp_requests_id'), 'otp_requests', ['id'], unique=False)
+  34 |     op.create_index(op.f('ix_otp_requests_phone'), 'otp_requests', ['phone'], unique=False)
+  35 |     op.create_table('users',
+  36 |     sa.Column('id', sa.Integer(), nullable=False),
+  37 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  38 |     sa.Column('phone', sa.String(length=20), nullable=False),
+  39 |     sa.Column('role', sa.String(length=32), nullable=False),
+  40 |     sa.Column('is_active', sa.Boolean(), nullable=False),
+  41 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  42 |     sa.PrimaryKeyConstraint('id')
+  43 |     )
+  44 |     op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
+  45 |     op.create_index(op.f('ix_users_phone'), 'users', ['phone'], unique=True)
+  46 |     op.create_index(op.f('ix_users_school_id'), 'users', ['school_id'], unique=False)
+  47 |     # ### end Alembic commands ###
+  48 | 
+  49 | 
+  50 | def downgrade() -> None:
+  51 |     # ### commands auto generated by Alembic - please adjust! ###
+  52 |     op.drop_index(op.f('ix_users_school_id'), table_name='users')
+  53 |     op.drop_index(op.f('ix_users_phone'), table_name='users')
+  54 |     op.drop_index(op.f('ix_users_id'), table_name='users')
+  55 |     op.drop_table('users')
+  56 |     op.drop_index(op.f('ix_otp_requests_phone'), table_name='otp_requests')
+  57 |     op.drop_index(op.f('ix_otp_requests_id'), table_name='otp_requests')
+  58 |     op.drop_table('otp_requests')
+  59 |     # ### end Alembic commands ###
+
+/alembic/versions/bef04c206c64_add_user_id_to_teachers.py:
+--------------------------------------------------------------------------------
+   1 | """add user_id to teachers
+   2 | 
+   3 | Revision ID: bef04c206c64
+   4 | Revises: 0cfca8bbc912
+   5 | Create Date: 2026-01-10 15:15:02.688716
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'bef04c206c64'
+  16 | down_revision: Union[str, None] = '0cfca8bbc912'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     pass
+  23 | 
+  24 | 
+  25 | def downgrade() -> None:
+  26 |     pass
+
+/alembic/versions/c4b1f0a1b2cd_restore_student_notes_table.py:
+--------------------------------------------------------------------------------
+   1 | """restore student_notes table if missing
+   2 | 
+   3 | Revision ID: c4b1f0a1b2cd
+   4 | Revises: b81809ab7aaf
+   5 | Create Date: 2026-01-13 12:10:00.000000
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | 
+  12 | 
+  13 | # revision identifiers, used by Alembic.
+  14 | revision: str = "c4b1f0a1b2cd"
+  15 | down_revision: Union[str, None] = "b81809ab7aaf"
+  16 | branch_labels: Union[str, Sequence[str], None] = None
+  17 | depends_on: Union[str, Sequence[str], None] = None
+  18 | 
+  19 | 
+  20 | def upgrade() -> None:
+  21 |     op.execute(
+  22 |         """
+  23 |         DO $$
+  24 |         BEGIN
+  25 |             IF NOT EXISTS (
+  26 |                 SELECT 1
+  27 |                 FROM information_schema.tables
+  28 |                 WHERE table_schema = 'public'
+  29 |                   AND table_name = 'student_notes'
+  30 |             ) THEN
+  31 |                 CREATE TABLE student_notes (
+  32 |                     id SERIAL PRIMARY KEY,
+  33 |                     school_id INTEGER NOT NULL
+  34 |                         REFERENCES schools(id) ON DELETE CASCADE,
+  35 |                     student_id INTEGER NOT NULL
+  36 |                         REFERENCES students(id) ON DELETE CASCADE,
+  37 |                     author_user_id INTEGER NULL
+  38 |                         REFERENCES users(id) ON DELETE SET NULL,
+  39 |                     note_text TEXT NOT NULL,
+  40 |                     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  41 |                 );
+  42 | 
+  43 |                 CREATE INDEX IF NOT EXISTS ix_student_notes_school_student
+  44 |                     ON student_notes (school_id, student_id);
+  45 |             END IF;
+  46 |         END $$;
+  47 |         """
+  48 |     )
+  49 | 
+  50 | 
+  51 | def downgrade() -> None:
+  52 |     op.execute(
+  53 |         """
+  54 |         DROP TABLE IF EXISTS student_notes CASCADE;
+  55 |         """
+  56 |     )
+
+/alembic/versions/c869ac6dbcd3_create_notification_outbox_table.py:
+--------------------------------------------------------------------------------
+   1 | """create notification outbox table
+   2 | 
+   3 | Revision ID: c869ac6dbcd3
+   4 | Revises: 72c57d77456d
+   5 | Create Date: 2025-12-29 15:44:37.270273
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'c869ac6dbcd3'
+  16 | down_revision: Union[str, None] = '72c57d77456d'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.add_column('notification_outbox', sa.Column('school_id', sa.Integer(), nullable=False))
+  24 |     op.add_column('notification_outbox', sa.Column('event_type', sa.String(length=64), nullable=False))
+  25 |     op.add_column('notification_outbox', sa.Column('attendance_submission_id', sa.Integer(), nullable=True))
+  26 |     op.add_column('notification_outbox', sa.Column('marks_submission_id', sa.Integer(), nullable=True))
+  27 |     op.add_column('notification_outbox', sa.Column('recipient_phone', sa.String(length=32), nullable=False))
+  28 |     op.add_column('notification_outbox', sa.Column('payload', sa.Text(), nullable=False))
+  29 |     op.add_column('notification_outbox', sa.Column('attempts', sa.Integer(), nullable=False))
+  30 |     op.add_column('notification_outbox', sa.Column('last_error', sa.Text(), nullable=True))
+  31 |     op.add_column('notification_outbox', sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True))
+  32 |     op.alter_column('notification_outbox', 'status',
+  33 |                existing_type=sa.VARCHAR(length=32),
+  34 |                type_=sa.String(length=16),
+  35 |                existing_nullable=False)
+  36 |     op.drop_index('ix_notification_outbox_student_id', table_name='notification_outbox')
+  37 |     op.drop_index('ix_notification_outbox_submission_id', table_name='notification_outbox')
+  38 |     op.drop_constraint('uq_outbox_submission_student_channel', 'notification_outbox', type_='unique')
+  39 |     op.create_index(op.f('ix_notification_outbox_attendance_submission_id'), 'notification_outbox', ['attendance_submission_id'], unique=False)
+  40 |     op.create_index(op.f('ix_notification_outbox_event_type'), 'notification_outbox', ['event_type'], unique=False)
+  41 |     op.create_index(op.f('ix_notification_outbox_marks_submission_id'), 'notification_outbox', ['marks_submission_id'], unique=False)
+  42 |     op.create_index(op.f('ix_notification_outbox_recipient_phone'), 'notification_outbox', ['recipient_phone'], unique=False)
+  43 |     op.create_index(op.f('ix_notification_outbox_school_id'), 'notification_outbox', ['school_id'], unique=False)
+  44 |     op.create_index(op.f('ix_notification_outbox_status'), 'notification_outbox', ['status'], unique=False)
+  45 |     op.create_index('uq_outbox_attendance_dedupe', 'notification_outbox', ['event_type', 'attendance_submission_id', 'recipient_phone'], unique=True, postgresql_where='attendance_submission_id IS NOT NULL')
+  46 |     op.create_index('uq_outbox_marks_dedupe', 'notification_outbox', ['event_type', 'marks_submission_id', 'recipient_phone'], unique=True, postgresql_where='marks_submission_id IS NOT NULL')
+  47 |     op.drop_constraint('notification_outbox_submission_id_fkey', 'notification_outbox', type_='foreignkey')
+  48 |     op.drop_constraint('notification_outbox_student_id_fkey', 'notification_outbox', type_='foreignkey')
+  49 |     op.create_foreign_key(None, 'notification_outbox', 'marks_submissions', ['marks_submission_id'], ['id'], ondelete='CASCADE')
+  50 |     op.create_foreign_key(None, 'notification_outbox', 'schools', ['school_id'], ['id'], ondelete='CASCADE')
+  51 |     op.create_foreign_key(None, 'notification_outbox', 'attendance_submissions', ['attendance_submission_id'], ['id'], ondelete='CASCADE')
+  52 |     op.drop_column('notification_outbox', 'submission_id')
+  53 |     op.drop_column('notification_outbox', 'student_id')
+  54 |     op.drop_column('notification_outbox', 'channel')
+  55 |     # ### end Alembic commands ###
+  56 | 
+  57 | 
+  58 | def downgrade() -> None:
+  59 |     # ### commands auto generated by Alembic - please adjust! ###
+  60 |     op.add_column('notification_outbox', sa.Column('channel', sa.VARCHAR(length=32), autoincrement=False, nullable=False))
+  61 |     op.add_column('notification_outbox', sa.Column('student_id', sa.INTEGER(), autoincrement=False, nullable=False))
+  62 |     op.add_column('notification_outbox', sa.Column('submission_id', sa.INTEGER(), autoincrement=False, nullable=False))
+  63 |     op.drop_constraint(None, 'notification_outbox', type_='foreignkey')
+  64 |     op.drop_constraint(None, 'notification_outbox', type_='foreignkey')
+  65 |     op.drop_constraint(None, 'notification_outbox', type_='foreignkey')
+  66 |     op.create_foreign_key('notification_outbox_student_id_fkey', 'notification_outbox', 'students', ['student_id'], ['id'], ondelete='CASCADE')
+  67 |     op.create_foreign_key('notification_outbox_submission_id_fkey', 'notification_outbox', 'attendance_submissions', ['submission_id'], ['id'], ondelete='CASCADE')
+  68 |     op.drop_index('uq_outbox_marks_dedupe', table_name='notification_outbox', postgresql_where='marks_submission_id IS NOT NULL')
+  69 |     op.drop_index('uq_outbox_attendance_dedupe', table_name='notification_outbox', postgresql_where='attendance_submission_id IS NOT NULL')
+  70 |     op.drop_index(op.f('ix_notification_outbox_status'), table_name='notification_outbox')
+  71 |     op.drop_index(op.f('ix_notification_outbox_school_id'), table_name='notification_outbox')
+  72 |     op.drop_index(op.f('ix_notification_outbox_recipient_phone'), table_name='notification_outbox')
+  73 |     op.drop_index(op.f('ix_notification_outbox_marks_submission_id'), table_name='notification_outbox')
+  74 |     op.drop_index(op.f('ix_notification_outbox_event_type'), table_name='notification_outbox')
+  75 |     op.drop_index(op.f('ix_notification_outbox_attendance_submission_id'), table_name='notification_outbox')
+  76 |     op.create_unique_constraint('uq_outbox_submission_student_channel', 'notification_outbox', ['submission_id', 'student_id', 'channel'])
+  77 |     op.create_index('ix_notification_outbox_submission_id', 'notification_outbox', ['submission_id'], unique=False)
+  78 |     op.create_index('ix_notification_outbox_student_id', 'notification_outbox', ['student_id'], unique=False)
+  79 |     op.alter_column('notification_outbox', 'status',
+  80 |                existing_type=sa.String(length=16),
+  81 |                type_=sa.VARCHAR(length=32),
+  82 |                existing_nullable=False)
+  83 |     op.drop_column('notification_outbox', 'sent_at')
+  84 |     op.drop_column('notification_outbox', 'last_error')
+  85 |     op.drop_column('notification_outbox', 'attempts')
+  86 |     op.drop_column('notification_outbox', 'payload')
+  87 |     op.drop_column('notification_outbox', 'recipient_phone')
+  88 |     op.drop_column('notification_outbox', 'marks_submission_id')
+  89 |     op.drop_column('notification_outbox', 'attendance_submission_id')
+  90 |     op.drop_column('notification_outbox', 'event_type')
+  91 |     op.drop_column('notification_outbox', 'school_id')
+  92 |     # ### end Alembic commands ###
+
+/alembic/versions/d424429bc79d_create_classes_and_sections_tables.py:
+--------------------------------------------------------------------------------
+   1 | """create classes and sections tables
+   2 | 
+   3 | Revision ID: d424429bc79d
+   4 | Revises: 03c5a6fc07ad
+   5 | Create Date: 2025-12-25 03:08:09.896764
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'd424429bc79d'
+  16 | down_revision: Union[str, None] = '03c5a6fc07ad'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('classes',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  26 |     sa.Column('name', sa.String(length=100), nullable=False),
+  27 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  28 |     sa.PrimaryKeyConstraint('id')
+  29 |     )
+  30 |     op.create_index(op.f('ix_classes_id'), 'classes', ['id'], unique=False)
+  31 |     op.create_index(op.f('ix_classes_school_id'), 'classes', ['school_id'], unique=False)
+  32 |     op.create_table('sections',
+  33 |     sa.Column('id', sa.Integer(), nullable=False),
+  34 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  35 |     sa.Column('class_id', sa.Integer(), nullable=False),
+  36 |     sa.Column('name', sa.String(length=50), nullable=False),
+  37 |     sa.ForeignKeyConstraint(['class_id'], ['classes.id'], ondelete='CASCADE'),
+  38 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  39 |     sa.PrimaryKeyConstraint('id')
+  40 |     )
+  41 |     op.create_index(op.f('ix_sections_class_id'), 'sections', ['class_id'], unique=False)
+  42 |     op.create_index(op.f('ix_sections_id'), 'sections', ['id'], unique=False)
+  43 |     op.create_index(op.f('ix_sections_school_id'), 'sections', ['school_id'], unique=False)
+  44 |     # ### end Alembic commands ###
+  45 | 
+  46 | 
+  47 | def downgrade() -> None:
+  48 |     # ### commands auto generated by Alembic - please adjust! ###
+  49 |     op.drop_index(op.f('ix_sections_school_id'), table_name='sections')
+  50 |     op.drop_index(op.f('ix_sections_id'), table_name='sections')
+  51 |     op.drop_index(op.f('ix_sections_class_id'), table_name='sections')
+  52 |     op.drop_table('sections')
+  53 |     op.drop_index(op.f('ix_classes_school_id'), table_name='classes')
+  54 |     op.drop_index(op.f('ix_classes_id'), table_name='classes')
+  55 |     op.drop_table('classes')
+  56 |     # ### end Alembic commands ###
+
+/alembic/versions/dc7cedc7c3fb_init.py:
+--------------------------------------------------------------------------------
+   1 | """init
+   2 | 
+   3 | Revision ID: dc7cedc7c3fb
+   4 | Revises: 
+   5 | Create Date: 2025-12-24 17:57:37.532408
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'dc7cedc7c3fb'
+  16 | down_revision: Union[str, None] = None
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     pass
+  23 | 
+  24 | 
+  25 | def downgrade() -> None:
+  26 |     pass
+
+/alembic/versions/e0154ef0f1a9_create_attendance_records_table.py:
+--------------------------------------------------------------------------------
+   1 | """create attendance_records table
+   2 | 
+   3 | Revision ID: e0154ef0f1a9
+   4 | Revises: d424429bc79d
+   5 | Create Date: 2025-12-29 12:08:19.755904
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'e0154ef0f1a9'
+  16 | down_revision: Union[str, None] = 'd424429bc79d'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     op.create_table('attendance_records',
+  24 |     sa.Column('id', sa.Integer(), nullable=False),
+  25 |     sa.Column('school_id', sa.Integer(), nullable=False),
+  26 |     sa.Column('student_id', sa.Integer(), nullable=False),
+  27 |     sa.Column('date', sa.Date(), nullable=False),
+  28 |     sa.Column('status', sa.String(length=16), nullable=False),
+  29 |     sa.Column('marked_by_user_id', sa.Integer(), nullable=True),
+  30 |     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+  31 |     sa.ForeignKeyConstraint(['marked_by_user_id'], ['users.id'], ondelete='SET NULL'),
+  32 |     sa.ForeignKeyConstraint(['school_id'], ['schools.id'], ondelete='CASCADE'),
+  33 |     sa.ForeignKeyConstraint(['student_id'], ['students.id'], ondelete='CASCADE'),
+  34 |     sa.PrimaryKeyConstraint('id'),
+  35 |     sa.UniqueConstraint('school_id', 'student_id', 'date', name='uq_attendance_school_student_date')
+  36 |     )
+  37 |     op.create_index(op.f('ix_attendance_records_date'), 'attendance_records', ['date'], unique=False)
+  38 |     op.create_index(op.f('ix_attendance_records_id'), 'attendance_records', ['id'], unique=False)
+  39 |     op.create_index(op.f('ix_attendance_records_marked_by_user_id'), 'attendance_records', ['marked_by_user_id'], unique=False)
+  40 |     op.create_index(op.f('ix_attendance_records_school_id'), 'attendance_records', ['school_id'], unique=False)
+  41 |     op.create_index(op.f('ix_attendance_records_student_id'), 'attendance_records', ['student_id'], unique=False)
+  42 |     # ### end Alembic commands ###
+  43 | 
+  44 | 
+  45 | def downgrade() -> None:
+  46 |     # ### commands auto generated by Alembic - please adjust! ###
+  47 |     op.drop_index(op.f('ix_attendance_records_student_id'), table_name='attendance_records')
+  48 |     op.drop_index(op.f('ix_attendance_records_school_id'), table_name='attendance_records')
+  49 |     op.drop_index(op.f('ix_attendance_records_marked_by_user_id'), table_name='attendance_records')
+  50 |     op.drop_index(op.f('ix_attendance_records_id'), table_name='attendance_records')
+  51 |     op.drop_index(op.f('ix_attendance_records_date'), table_name='attendance_records')
+  52 |     op.drop_table('attendance_records')
+  53 |     # ### end Alembic commands ###
+
+/alembic/versions/eeebd7c393ce_.py:
+--------------------------------------------------------------------------------
+   1 | """empty message
+   2 | 
+   3 | Revision ID: eeebd7c393ce
+   4 | Revises: dc7cedc7c3fb
+   5 | Create Date: 2025-12-24 18:27:29.513345
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'eeebd7c393ce'
+  16 | down_revision: Union[str, None] = 'dc7cedc7c3fb'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     # ### commands auto generated by Alembic - please adjust! ###
+  23 |     pass
+  24 |     # ### end Alembic commands ###
+  25 | 
+  26 | 
+  27 | def downgrade() -> None:
+  28 |     # ### commands auto generated by Alembic - please adjust! ###
+  29 |     pass
+  30 |     # ### end Alembic commands ###
+
+/alembic/versions/f7a2fa09402b_create_student_notes_table.py:
+--------------------------------------------------------------------------------
+   1 | """create student_notes table
+   2 | 
+   3 | Revision ID: f7a2fa09402b
+   4 | Revises: bef04c206c64
+   5 | Create Date: 2026-01-12 16:32:06.353572
+   6 | 
+   7 | """
+   8 | from typing import Sequence, Union
+   9 | 
+  10 | from alembic import op
+  11 | import sqlalchemy as sa
+  12 | 
+  13 | 
+  14 | # revision identifiers, used by Alembic.
+  15 | revision: str = 'f7a2fa09402b'
+  16 | down_revision: Union[str, None] = 'bef04c206c64'
+  17 | branch_labels: Union[str, Sequence[str], None] = None
+  18 | depends_on: Union[str, Sequence[str], None] = None
+  19 | 
+  20 | 
+  21 | def upgrade() -> None:
+  22 |     op.create_table(
+  23 |         "student_notes",
+  24 |         sa.Column("id", sa.Integer(), primary_key=True),
+  25 |         sa.Column("school_id", sa.Integer(), nullable=False),
+  26 |         sa.Column("student_id", sa.Integer(), nullable=False),
+  27 |         sa.Column("author_user_id", sa.Integer(), nullable=True),
+  28 |         sa.Column("note_text", sa.Text(), nullable=False),
+  29 |         sa.Column(
+  30 |             "created_at",
+  31 |             sa.DateTime(timezone=True),
+  32 |             server_default=sa.func.now(),
+  33 |             nullable=False,
+  34 |         ),
+  35 |         sa.ForeignKeyConstraint(
+  36 |             ["school_id"], ["schools.id"], ondelete="CASCADE"
+  37 |         ),
+  38 |         sa.ForeignKeyConstraint(
+  39 |             ["student_id"], ["students.id"], ondelete="CASCADE"
+  40 |         ),
+  41 |         sa.ForeignKeyConstraint(
+  42 |             ["author_user_id"], ["users.id"], ondelete="SET NULL"
+  43 |         ),
+  44 |     )
+  45 | 
+  46 |     op.create_index(
+  47 |         "ix_student_notes_school_student",
+  48 |         "student_notes",
+  49 |         ["school_id", "student_id"],
+  50 |     )
+  51 | 
+  52 | 
+  53 | def downgrade() -> None:
+  54 |     op.drop_index("ix_student_notes_school_student",
+  55 |                   table_name="student_notes")
+  56 |     op.drop_table("student_notes")
+
+/app/api/v1/deps.py:
+--------------------------------------------------------------------------------
+   1 | import base64
+   2 | import hmac
+   3 | import json
+   4 | 
+   5 | from datetime import datetime, timezone
+   6 | from typing import Generator
+   7 | from app.db.session import SessionLocal
+   8 | from datetime import datetime, timezone
+   9 | from fastapi import Depends, HTTPException, status
+  10 | from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+  11 | from app.core.config import settings
+  12 | 
+  13 | security = HTTPBearer(auto_error=False)
+  14 | 
+  15 | 
+  16 | def get_db() -> Generator:
+  17 |     """
+  18 |     FastAPI dependency that provides a database session.
+  19 | 
+  20 |     Why this exists:
+  21 |     - Ensures one DB session per request
+  22 |     - Guarantees session is closed after request
+  23 |     - Centralizes DB lifecycle management
+  24 |     """
+  25 |     db = SessionLocal()
+  26 |     try:
+  27 |         yield db
+  28 |     finally:
+  29 |         db.close()
+  30 | 
+  31 | 
+  32 | def _b64url_decode(data: str) -> bytes:
+  33 |     padding = "=" * (-len(data) % 4)
+  34 |     return base64.urlsafe_b64decode(data + padding)
+  35 | 
+  36 | 
+  37 | def _jwt_decode_hs256(token: str) -> dict:
+  38 |     try:
+  39 |         header_b64, payload_b64, sig_b64 = token.split(".")
+  40 |     except ValueError:
+  41 |         raise HTTPException(
+  42 |             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
+  43 | 
+  44 |     signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+  45 |     expected_sig = hmac.new(
+  46 |         settings.jwt_secret.encode("utf-8"),
+  47 |         signing_input,
+  48 |         digestmod="sha256",
+  49 |     ).digest()
+  50 | 
+  51 |     actual_sig = _b64url_decode(sig_b64)
+  52 | 
+  53 |     if not hmac.compare_digest(expected_sig, actual_sig):
+  54 |         raise HTTPException(
+  55 |             status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_signature")
+  56 | 
+  57 |     payload = json.loads(_b64url_decode(payload_b64))
+  58 | 
+  59 |     now = int(datetime.now(timezone.utc).timestamp())
+  60 |     if payload.get("exp") and payload["exp"] < now:
+  61 |         raise HTTPException(
+  62 |             status_code=status.HTTP_401_UNAUTHORIZED, detail="token_expired")
+  63 | 
+  64 |     return payload
+  65 | 
+  66 | 
+  67 | def get_current_user(
+  68 |     credentials: HTTPAuthorizationCredentials = Depends(security),
+  69 | ) -> dict:
+  70 |     if not credentials:
+  71 |         raise HTTPException(
+  72 |             status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_token")
+  73 | 
+  74 |     token = credentials.credentials
+  75 |     payload = _jwt_decode_hs256(token)
+  76 | 
+  77 |     return {
+  78 |         "user_id": int(payload["sub"]),
+  79 |         "school_id": payload["school_id"],
+  80 |         "role": payload["role"],
+  81 |     }
+  82 | 
+  83 | 
+  84 | def require_management(current_user: dict = Depends(get_current_user)) -> dict:
+  85 |     if current_user.get("role") != "MANAGEMENT":
+  86 |         raise HTTPException(
+  87 |             status_code=status.HTTP_403_FORBIDDEN,
+  88 |             detail="insufficient_permissions",
+  89 |         )
+  90 |     return current_user
+  91 | 
+  92 | 
+  93 | def require_teacher(current_user: dict = Depends(get_current_user)) -> dict:
+  94 |     if current_user.get("role") != "TEACHER":
+  95 |         raise HTTPException(
+  96 |             status_code=status.HTTP_403_FORBIDDEN,
+  97 |             detail="insufficient_permissions",
+  98 |         )
+  99 |     return current_user
+ 100 | 
+ 101 | 
+ 102 | def require_teacher_or_management_or_principal(
+ 103 |     current_user: dict = Depends(get_current_user),
+ 104 | ) -> dict:
+ 105 |     if current_user["role"] not in ["TEACHER", "MANAGEMENT", "PRINCIPAL"]:
+ 106 |         raise HTTPException(
+ 107 |             status_code=status.HTTP_403_FORBIDDEN,
+ 108 |             detail="insufficient_permissions",
+ 109 |         )
+ 110 |     return current_user
+
+/app/api/v1/router.py:
+--------------------------------------------------------------------------------
+   1 | from fastapi import APIRouter
+   2 | 
+   3 | from app.api.v1.routes import health
+   4 | from app.api.v1.routes import schools
+   5 | from app.api.v1.routes import teachers
+   6 | from app.api.v1.routes import auth
+   7 | from app.api.v1.routes import auth_debug
+   8 | from app.api.v1.routes import students
+   9 | from app.api.v1.routes import classes
+  10 | from app.api.v1.routes import sections
+  11 | from app.api.v1.routes import attendance
+  12 | from app.api.v1.routes import subjects
+  13 | from app.api.v1.routes import marks
+  14 | from app.api.v1.routes import notifications
+  15 | from app.api.v1.routes import teacher_me
+  16 | from app.api.v1.routes import student_notes
+  17 | from app.api.v1.routes import teaching_assignments
+  18 | from app.api.v1.routes import management_teachers
+  19 | from app.api.v1.routes import teachers_me
+  20 | from app.api.v1.routes import management_principal
+  21 | 
+  22 | api_router = APIRouter()
+  23 | 
+  24 | 
+  25 | api_router.include_router(health.router)
+  26 | api_router.include_router(schools.router)
+  27 | api_router.include_router(teachers.router)
+  28 | api_router.include_router(auth.router)
+  29 | api_router.include_router(auth_debug.router)
+  30 | api_router.include_router(students.router)
+  31 | api_router.include_router(classes.router)
+  32 | api_router.include_router(sections.router)
+  33 | api_router.include_router(attendance.router)
+  34 | api_router.include_router(subjects.router)
+  35 | api_router.include_router(marks.router)
+  36 | api_router.include_router(notifications.router)
+  37 | api_router.include_router(teacher_me.router)
+  38 | api_router.include_router(student_notes.router)
+  39 | api_router.include_router(teaching_assignments.router)
+  40 | api_router.include_router(management_teachers.router)
+  41 | api_router.include_router(teachers_me.router)
+  42 | api_router.include_router(management_principal.router)
+
+/app/api/v1/routes/__init__.py:
+--------------------------------------------------------------------------------
+   1 | 
+
+/app/api/v1/routes/attendance.py:
+--------------------------------------------------------------------------------
+   1 | import json
+   2 | 
+   3 | from datetime import date as date_type
+   4 | 
+   5 | from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+   6 | from pydantic import BaseModel, ConfigDict
+   7 | from sqlalchemy.exc import IntegrityError
+   8 | from sqlalchemy.orm import Session
+   9 | 
+  10 | from app.api.v1.deps import get_db, get_current_user
+  11 | from app.db.models.attendance_record import AttendanceRecord
+  12 | from app.db.models.student import Student
+  13 | from app.db.models.attendance_submission import AttendanceSubmission
+  14 | from app.db.models.section import Section
+  15 | from app.db.models.notification_outbox import NotificationOutbox
+  16 | 
+  17 | router = APIRouter(prefix="/attendance", tags=["attendance"])
+  18 | 
+  19 | 
+  20 | class AttendanceCreate(BaseModel):
+  21 |     model_config = ConfigDict(extra="forbid")
+  22 | 
+  23 |     student_id: int
+  24 |     date: date_type
+  25 |     status: str  # "present" | "absent"
+  26 | 
+  27 | 
+  28 | class AttendanceOut(BaseModel):
+  29 |     id: int
+  30 |     school_id: int
+  31 |     student_id: int
+  32 |     date: date_type
+  33 |     status: str
+  34 |     marked_by_user_id: int | None
+  35 | 
+  36 |     class Config:
+  37 |         from_attributes = True
+  38 | 
+  39 | 
+  40 | class AttendanceSubmitIn(BaseModel):
+  41 |     model_config = ConfigDict(extra="forbid")
+  42 | 
+  43 |     section_id: int
+  44 |     date: date_type
+  45 | 
+  46 | 
+  47 | class AttendanceSubmissionOut(BaseModel):
+  48 |     id: int
+  49 |     school_id: int
+  50 |     section_id: int
+  51 |     date: date_type
+  52 |     submitted_by_user_id: int | None
+  53 | 
+  54 |     class Config:
+  55 |         from_attributes = True
+  56 | 
+  57 | 
+  58 | @router.post("", response_model=AttendanceOut, status_code=201)
+  59 | def create_attendance(
+  60 |     payload: AttendanceCreate,
+  61 |     response: Response,
+  62 |     db: Session = Depends(get_db),
+  63 |     current_user: dict = Depends(get_current_user),
+  64 | ):
+  65 |     # Validate student belongs to same school (tenant isolation)
+  66 |     student = (
+  67 |         db.query(Student)
+  68 |         .filter(
+  69 |             Student.id == payload.student_id,
+  70 |             Student.school_id == current_user["school_id"],
+  71 |         )
+  72 |         .first()
+  73 |     )
+  74 |     if not student:
+  75 |         raise HTTPException(
+  76 |             status_code=status.HTTP_400_BAD_REQUEST,
+  77 |             detail="invalid_student_id",
+  78 |         )
+  79 | 
+  80 |     row = AttendanceRecord(
+  81 |         school_id=current_user["school_id"],
+  82 |         student_id=payload.student_id,
+  83 |         date=payload.date,
+  84 |         status=payload.status,
+  85 |         marked_by_user_id=current_user["user_id"],
+  86 |     )
+  87 | 
+  88 |     db.add(row)
+  89 |     try:
+  90 |         db.commit()
+  91 |     except IntegrityError:
+  92 |         db.rollback()
+  93 | 
+  94 |         existing = (
+  95 |             db.query(AttendanceRecord)
+  96 |             .filter(
+  97 |                 AttendanceRecord.school_id == current_user["school_id"],
+  98 |                 AttendanceRecord.student_id == payload.student_id,
+  99 |                 AttendanceRecord.date == payload.date,
+ 100 |             )
+ 101 |             .first()
+ 102 |         )
+ 103 |         if existing and existing.status == payload.status:
+ 104 |             # True idempotency: same status => return existing record as 200
+ 105 |             response.status_code = status.HTTP_200_OK
+ 106 |             return existing
+ 107 | 
+ 108 |         # Conflict: same student+date already exists but status differs
+ 109 |         raise HTTPException(
+ 110 |             status_code=status.HTTP_409_CONFLICT,
+ 111 |             detail="conflicting_status",
+ 112 |         )
+ 113 | 
+ 114 |     db.refresh(row)
+ 115 |     return row
+ 116 | 
+ 117 | 
+ 118 | @router.get("", response_model=list[AttendanceOut])
+ 119 | def list_attendance(
+ 120 |     date: date_type = Query(..., description="Attendance date in YYYY-MM-DD"),
+ 121 |     db: Session = Depends(get_db),
+ 122 |     current_user: dict = Depends(get_current_user),
+ 123 | ):
+ 124 |     return (
+ 125 |         db.query(AttendanceRecord)
+ 126 |         .filter(
+ 127 |             AttendanceRecord.school_id == current_user["school_id"],
+ 128 |             AttendanceRecord.date == date,
+ 129 |         )
+ 130 |         .order_by(AttendanceRecord.id.asc())
+ 131 |         .all()
+ 132 |     )
+ 133 | 
+ 134 | 
+ 135 | @router.post("/submit", response_model=AttendanceSubmissionOut, status_code=201)
+ 136 | def submit_attendance(
+ 137 |     payload: AttendanceSubmitIn,
+ 138 |     response: Response,
+ 139 |     db: Session = Depends(get_db),
+ 140 |     current_user: dict = Depends(get_current_user),
+ 141 | ):
+ 142 |     # Validate section belongs to same school (tenant isolation)
+ 143 |     sec = (
+ 144 |         db.query(Section)
+ 145 |         .filter(
+ 146 |             Section.id == payload.section_id,
+ 147 |             Section.school_id == current_user["school_id"],
+ 148 |         )
+ 149 |         .first()
+ 150 |     )
+ 151 |     if not sec:
+ 152 |         raise HTTPException(
+ 153 |             status_code=status.HTTP_400_BAD_REQUEST,
+ 154 |             detail="invalid_section_id",
+ 155 |         )
+ 156 | 
+ 157 |     row = AttendanceSubmission(
+ 158 |         school_id=current_user["school_id"],
+ 159 |         section_id=payload.section_id,
+ 160 |         date=payload.date,
+ 161 |         submitted_by_user_id=current_user["user_id"],
+ 162 |     )
+ 163 | 
+ 164 |     db.add(row)
+ 165 | 
+ 166 |     try:
+ 167 |         # flush so row.id is available before enqueue
+ 168 |         db.flush()
+ 169 | 
+ 170 |         # recipients = all students in the submitted section for this school
+ 171 |         students = (
+ 172 |             db.query(Student)
+ 173 |             .filter(
+ 174 |                 Student.school_id == current_user["school_id"],
+ 175 |                 Student.section_id == payload.section_id,
+ 176 |             )
+ 177 |             .all()
+ 178 |         )
+ 179 | 
+ 180 |         # enqueue outbox rows (deduped by unique constraint)
+ 181 |         for s in students:
+ 182 |             db.add(
+ 183 |                 NotificationOutbox(
+ 184 |                     school_id=current_user["school_id"],
+ 185 |                     event_type="ATTENDANCE_SUBMITTED",
+ 186 |                     attendance_submission_id=row.id,
+ 187 |                     marks_submission_id=None,
+ 188 |                     recipient_phone=s.parent_phone,
+ 189 |                     payload=json.dumps(
+ 190 |                         {
+ 191 |                             "type": "attendance_submitted",
+ 192 |                             "date": str(payload.date),
+ 193 |                             "student_id": s.id,
+ 194 |                             "section_id": payload.section_id,
+ 195 |                         }
+ 196 |                     ),
+ 197 |                     status="PENDING",
+ 198 |                     attempts=0,
+ 199 |                 )
+ 200 |             )
+ 201 | 
+ 202 |         db.commit()
+ 203 | 
+ 204 |     except IntegrityError:
+ 205 |         db.rollback()
+ 206 | 
+ 207 |         existing = (
+ 208 |             db.query(AttendanceSubmission)
+ 209 |             .filter(
+ 210 |                 AttendanceSubmission.school_id == current_user["school_id"],
+ 211 |                 AttendanceSubmission.section_id == payload.section_id,
+ 212 |                 AttendanceSubmission.date == payload.date,
+ 213 |             )
+ 214 |             .first()
+ 215 |         )
+ 216 |         if existing:
+ 217 |             # Idempotent submit: do NOT enqueue again
+ 218 |             response.status_code = status.HTTP_200_OK
+ 219 |             return existing
+ 220 | 
+ 221 |         raise HTTPException(status_code=409, detail="already_submitted")
+ 222 | 
+ 223 |     db.refresh(row)
+ 224 |     return row
+
+/app/api/v1/routes/auth.py:
+--------------------------------------------------------------------------------
+   1 | import hashlib
+   2 | import secrets
+   3 | import base64
+   4 | import hmac
+   5 | import json
+   6 | import os
+   7 | 
+   8 | from datetime import datetime, timedelta, timezone
+   9 | from fastapi import APIRouter, HTTPException, status, Depends
+  10 | from pydantic import BaseModel
+  11 | from sqlalchemy.orm import Session
+  12 | 
+  13 | from app.api.v1.deps import get_db
+  14 | from app.db.models.otp_request import OtpRequest
+  15 | from app.db.models.user import User
+  16 | from app.core.config import settings
+  17 | 
+  18 | router = APIRouter(prefix="/auth", tags=["auth"])
+  19 | 
+  20 | # Pilot-safe "pepper" for hashing. Later we should replace this with Settings.SECRET_KEY.
+  21 | OTP_TTL_MINUTES = settings.otp_ttl_minutes
+  22 | OTP_PEPPER = settings.otp_pepper
+  23 | JWT_SECRET = settings.jwt_secret
+  24 | JWT_TTL_MINUTES = settings.jwt_ttl_minutes
+  25 | 
+  26 | 
+  27 | class OtpRequestIn(BaseModel):
+  28 |     phone: str
+  29 | 
+  30 | 
+  31 | class OtpRequestOut(BaseModel):
+  32 |     status: str
+  33 | 
+  34 | 
+  35 | class OtpVerifyIn(BaseModel):
+  36 |     phone: str
+  37 |     otp: str
+  38 | 
+  39 | 
+  40 | class TokenOut(BaseModel):
+  41 |     access_token: str
+  42 |     token_type: str = "bearer"
+  43 | 
+  44 | 
+  45 | def _hash_otp(phone: str, otp: str) -> str:
+  46 |     payload = f"{phone}:{otp}:{OTP_PEPPER}".encode("utf-8")
+  47 |     return hashlib.sha256(payload).hexdigest()
+  48 | 
+  49 | 
+  50 | def _b64url_encode(data: bytes) -> str:
+  51 |     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
+  52 | 
+  53 | 
+  54 | def _jwt_encode_hs256(payload: dict) -> str:
+  55 |     header = {"alg": "HS256", "typ": "JWT"}
+  56 | 
+  57 |     header_b64 = _b64url_encode(json.dumps(
+  58 |         header, separators=(",", ":")).encode("utf-8"))
+  59 |     payload_b64 = _b64url_encode(json.dumps(
+  60 |         payload, separators=(",", ":")).encode("utf-8"))
+  61 | 
+  62 |     signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
+  63 |     sig = hmac.new(JWT_SECRET.encode("utf-8"),
+  64 |                    signing_input, hashlib.sha256).digest()
+  65 |     sig_b64 = _b64url_encode(sig)
+  66 | 
+  67 |     return f"{header_b64}.{payload_b64}.{sig_b64}"
+  68 | 
+  69 | 
+  70 | @router.post("/otp/request", response_model=OtpRequestOut, status_code=200)
+  71 | def request_otp(payload: OtpRequestIn, db: Session = Depends(get_db)):
+  72 |     otp = f"{secrets.randbelow(10_000):04d}"
+  73 |     otp_hash = _hash_otp(payload.phone, otp)
+  74 | 
+  75 |     expires_at = datetime.now(timezone.utc) + \
+  76 |         timedelta(minutes=OTP_TTL_MINUTES)
+  77 | 
+  78 |     row = OtpRequest(
+  79 |         phone=payload.phone,
+  80 |         otp_hash=otp_hash,
+  81 |         expires_at=expires_at,
+  82 |         attempt_count=0,
+  83 |         consumed_at=None,
+  84 |     )
+  85 |     db.add(row)
+  86 |     db.commit()
+  87 | 
+  88 |     # Pilot mode: OTP "send" is console/log only
+  89 |     if settings.environment == "dev" and settings.debug:
+  90 |         print(
+  91 |             f"[OTP] phone={payload.phone} otp={otp} expires_in_min={OTP_TTL_MINUTES}")
+  92 | 
+  93 |     return {"status": "otp_sent"}
+  94 | 
+  95 | 
+  96 | @router.post("/otp/verify", response_model=TokenOut, status_code=200)
+  97 | def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
+  98 |     now = datetime.now(timezone.utc)
+  99 | 
+ 100 |     otp_row = (
+ 101 |         db.query(OtpRequest)
+ 102 |         .filter(
+ 103 |             OtpRequest.phone == payload.phone,
+ 104 |             OtpRequest.consumed_at.is_(None),
+ 105 |         )
+ 106 |         .order_by(OtpRequest.id.desc())
+ 107 |         .first()
+ 108 |     )
+ 109 | 
+ 110 |     if not otp_row:
+ 111 |         raise HTTPException(
+ 112 |             status_code=status.HTTP_400_BAD_REQUEST, detail="otp_not_found")
+ 113 | 
+ 114 |     if otp_row.expires_at <= now:
+ 115 |         raise HTTPException(
+ 116 |             status_code=status.HTTP_400_BAD_REQUEST, detail="otp_expired")
+ 117 | 
+ 118 |     expected_hash = otp_row.otp_hash
+ 119 |     provided_hash = _hash_otp(payload.phone, payload.otp)
+ 120 | 
+ 121 |     if not hmac.compare_digest(expected_hash, provided_hash):
+ 122 |         otp_row.attempt_count = (otp_row.attempt_count or 0) + 1
+ 123 |         db.add(otp_row)
+ 124 |         db.commit()
+ 125 |         raise HTTPException(
+ 126 |             status_code=status.HTTP_400_BAD_REQUEST, detail="otp_invalid")
+ 127 | 
+ 128 |     otp_row.consumed_at = now
+ 129 |     db.add(otp_row)
+ 130 |     db.commit()
+ 131 | 
+ 132 |     user = (
+ 133 |         db.query(User)
+ 134 |         .filter(User.phone == payload.phone, User.is_active.is_(True))
+ 135 |         .first()
+ 136 |     )
+ 137 |     if not user:
+ 138 |         raise HTTPException(
+ 139 |             status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+ 140 | 
+ 141 |     exp = now + timedelta(minutes=JWT_TTL_MINUTES)
+ 142 | 
+ 143 |     token_payload = {
+ 144 |         "sub": str(user.id),
+ 145 |         "school_id": user.school_id,
+ 146 |         "role": user.role,
+ 147 |         "iat": int(now.timestamp()),
+ 148 |         "exp": int(exp.timestamp()),
+ 149 |     }
+ 150 | 
+ 151 |     token = _jwt_encode_hs256(token_payload)
+ 152 |     return {"access_token": token, "token_type": "bearer"}
+
+/app/api/v1/routes/auth_debug.py:
+--------------------------------------------------------------------------------
+   1 | from fastapi import APIRouter, Depends
+   2 | 
+   3 | from app.api.v1.deps import get_current_user
+   4 | 
+   5 | router = APIRouter(prefix="/auth", tags=["auth"])
+   6 | 
+   7 | 
+   8 | @router.get("/me")
+   9 | def me(current_user: dict = Depends(get_current_user)):
+  10 |     # Returns the decoded user context from JWT: user_id, school_id, role
+  11 |     return current_user
+
+/app/api/v1/routes/classes.py:
+--------------------------------------------------------------------------------
+   1 | from typing import List, Optional
+   2 | 
+   3 | from fastapi import APIRouter, Depends
+   4 | from pydantic import BaseModel, ConfigDict
+   5 | from sqlalchemy.orm import Session
+   6 | 
+   7 | from app.api.v1.deps import get_db, get_current_user
+   8 | from app.db.models.class_ import Class
+   9 | 
+  10 | router = APIRouter(prefix="/classes", tags=["classes"])
+  11 | 
+  12 | 
+  13 | class ClassCreate(BaseModel):
+  14 |     model_config = ConfigDict(extra="forbid")
+  15 | 
+  16 |     name: str
+  17 | 
+  18 | 
+  19 | class ClassOut(BaseModel):
+  20 |     id: int
+  21 |     school_id: int
+  22 |     name: str
+  23 | 
+  24 |     class Config:
+  25 |         from_attributes = True
+  26 | 
+  27 | 
+  28 | @router.get("", response_model=List[ClassOut])
+  29 | def list_classes(
+  30 |     db: Session = Depends(get_db),
+  31 |     current_user: dict = Depends(get_current_user),
+  32 | ):
+  33 |     return (
+  34 |         db.query(Class)
+  35 |         .filter(Class.school_id == current_user["school_id"])
+  36 |         .order_by(Class.id.asc())
+  37 |         .all()
+  38 |     )
+  39 | 
+  40 | 
+  41 | @router.post("", response_model=ClassOut, status_code=201)
+  42 | def create_class(
+  43 |     payload: ClassCreate,
+  44 |     db: Session = Depends(get_db),
+  45 |     current_user: dict = Depends(get_current_user),
+  46 | ):
+  47 |     row = Class(
+  48 |         school_id=current_user["school_id"],
+  49 |         name=payload.name,
+  50 |     )
+  51 |     db.add(row)
+  52 |     db.commit()
+  53 |     db.refresh(row)
+  54 |     return row
+
+/app/api/v1/routes/health.py:
+--------------------------------------------------------------------------------
+   1 | from fastapi import APIRouter
+   2 | from pydantic import BaseModel
+   3 | 
+   4 | router = APIRouter(tags=["health"])
+   5 | 
+   6 | 
+   7 | class HealthResponse(BaseModel):
+   8 |     status: str
+   9 | 
+  10 | 
+  11 | @router.get("/health/live", response_model=HealthResponse)
+  12 | def live() -> HealthResponse:
+  13 |     """
+  14 |     Liveness probe: confirms the process is running.
+  15 |     No external dependencies.
+  16 |     """
+  17 |     return HealthResponse(status="ok")
+  18 | 
+  19 | 
+  20 | @router.get("/health/ready", response_model=HealthResponse)
+  21 | def ready() -> HealthResponse:
+  22 |     """
+  23 |     Readiness probe: confirms the service is ready to serve traffic.
+  24 |     For now, no DB check. We will add DB ping once SQLAlchemy is wired.
+  25 |     """
+  26 |     return HealthResponse(status="ok")
+
+/app/api/v1/routes/management_principal.py:
+--------------------------------------------------------------------------------
+   1 | from __future__ import annotations
+   2 | 
+   3 | from fastapi import APIRouter, Depends, HTTPException, Response, status
+   4 | from pydantic import BaseModel, ConfigDict, Field, model_validator
+   5 | from sqlalchemy.orm import Session
+   6 | 
+   7 | from app.api.v1.deps import get_db, require_management
+   8 | from app.db.models.principal import Principal
+   9 | from app.db.models.user import User
+  10 | 
+  11 | router = APIRouter(prefix="/management/principal",
+  12 |                    tags=["management-principal"])
+  13 | 
+  14 | 
+  15 | class ManagementPrincipalIn(BaseModel):
+  16 |     model_config = ConfigDict(extra="forbid")
+  17 | 
+  18 |     name: str = Field(min_length=1, max_length=200)
+  19 |     phone: str = Field(min_length=10, max_length=20)
+  20 |     email: str | None = Field(default=None, min_length=5, max_length=255)
+  21 | 
+  22 |     @model_validator(mode="after")
+  23 |     def normalize(self) -> "ManagementPrincipalIn":
+  24 |         self.phone = self.phone.strip()
+  25 |         if self.email is not None:
+  26 |             self.email = self.email.strip()
+  27 |             if self.email == "":
+  28 |                 self.email = None
+  29 |         self.name = self.name.strip()
+  30 |         return self
+  31 | 
+  32 | 
+  33 | class ManagementPrincipalOut(BaseModel):
+  34 |     principal_id: int
+  35 |     user_id: int
+  36 |     name: str
+  37 |     phone: str
+  38 |     email: str | None = None
+  39 | 
+  40 | 
+  41 | @router.get("", response_model=ManagementPrincipalOut)
+  42 | def get_management_principal(
+  43 |     db: Session = Depends(get_db),
+  44 |     current_user: dict = Depends(require_management),
+  45 | ):
+  46 |     school_id = current_user["school_id"]
+  47 | 
+  48 |     principal = db.query(Principal).filter(
+  49 |         Principal.school_id == school_id).first()
+  50 |     if not principal:
+  51 |         raise HTTPException(status_code=404, detail="principal_not_found")
+  52 | 
+  53 |     user = (
+  54 |         db.query(User)
+  55 |         .filter(User.school_id == school_id, User.id == principal.user_id)
+  56 |         .first()
+  57 |     )
+  58 |     # If this happens, DB is inconsistent. Treat as not found for safety.
+  59 |     if not user:
+  60 |         raise HTTPException(status_code=404, detail="principal_not_found")
+  61 | 
+  62 |     return ManagementPrincipalOut(
+  63 |         principal_id=principal.id,
+  64 |         user_id=user.id,
+  65 |         name=principal.name,
+  66 |         phone=getattr(user, "phone", None),
+  67 |         email=getattr(user, "email", None),
+  68 |     )
+  69 | 
+  70 | 
+  71 | @router.post("", response_model=ManagementPrincipalOut, status_code=201)
+  72 | def upsert_management_principal(
+  73 |     payload: ManagementPrincipalIn,
+  74 |     response: Response,
+  75 |     db: Session = Depends(get_db),
+  76 |     current_user: dict = Depends(require_management),
+  77 | ):
+  78 |     school_id = current_user["school_id"]
+  79 | 
+  80 |     # 1) Find existing user by phone (tenant-scoped)
+  81 |     existing_user = (
+  82 |         db.query(User)
+  83 |         .filter(User.school_id == school_id, User.phone == payload.phone)
+  84 |         .first()
+  85 |     )
+  86 | 
+  87 |     # 2) Find existing principal row (one per school)
+  88 |     existing_principal = db.query(Principal).filter(
+  89 |         Principal.school_id == school_id).first()
+  90 | 
+  91 |     # Helper: safely deactivate previous principal user if column exists
+  92 |     def _deactivate_user_if_supported(user_obj: User) -> None:
+  93 |         if hasattr(user_obj, "is_active"):
+  94 |             setattr(user_obj, "is_active", False)
+  95 | 
+  96 |     # CASE A: user exists
+  97 |     if existing_user:
+  98 |         # Ensure role becomes PRINCIPAL (force)
+  99 |         if hasattr(existing_user, "role"):
+ 100 |             setattr(existing_user, "role", "PRINCIPAL")
+ 101 |         if hasattr(existing_user, "is_active"):
+ 102 |             setattr(existing_user, "is_active", True)
+ 103 |         if payload.email is not None and hasattr(existing_user, "email"):
+ 104 |             setattr(existing_user, "email", payload.email)
+ 105 | 
+ 106 |         # A1) If principal exists and already points to this user -> idempotent 200
+ 107 |         if existing_principal and existing_principal.user_id == existing_user.id:
+ 108 |             response.status_code = status.HTTP_200_OK
+ 109 |             # Keep name up to date if they resend (pilot-safe)
+ 110 |             existing_principal.name = payload.name
+ 111 |             db.commit()
+ 112 |             db.refresh(existing_principal)
+ 113 |             return ManagementPrincipalOut(
+ 114 |                 principal_id=existing_principal.id,
+ 115 |                 user_id=existing_user.id,
+ 116 |                 name=existing_principal.name,
+ 117 |                 phone=getattr(existing_user, "phone", None),
+ 118 |                 email=getattr(existing_user, "email", None),
+ 119 |             )
+ 120 | 
+ 121 |         # A2) Replacement or first principal row
+ 122 |         if existing_principal:
+ 123 |             # deactivate old principal user (if supported)
+ 124 |             old_user = (
+ 125 |                 db.query(User)
+ 126 |                 .filter(User.school_id == school_id, User.id == existing_principal.user_id)
+ 127 |                 .first()
+ 128 |             )
+ 129 |             if old_user and old_user.id != existing_user.id:
+ 130 |                 _deactivate_user_if_supported(old_user)
+ 131 | 
+ 132 |             existing_principal.user_id = existing_user.id
+ 133 |             existing_principal.name = payload.name
+ 134 |             db.commit()
+ 135 |             db.refresh(existing_principal)
+ 136 |             return ManagementPrincipalOut(
+ 137 |                 principal_id=existing_principal.id,
+ 138 |                 user_id=existing_user.id,
+ 139 |                 name=existing_principal.name,
+ 140 |                 phone=getattr(existing_user, "phone", None),
+ 141 |                 email=getattr(existing_user, "email", None),
+ 142 |             )
+ 143 | 
+ 144 |         # No principal row yet -> create it (201)
+ 145 |         principal = Principal(school_id=school_id,
+ 146 |                               user_id=existing_user.id, name=payload.name)
+ 147 |         db.add(principal)
+ 148 |         db.commit()
+ 149 |         db.refresh(principal)
+ 150 |         return ManagementPrincipalOut(
+ 151 |             principal_id=principal.id,
+ 152 |             user_id=existing_user.id,
+ 153 |             name=principal.name,
+ 154 |             phone=getattr(existing_user, "phone", None),
+ 155 |             email=getattr(existing_user, "email", None),
+ 156 |         )
+ 157 | 
+ 158 |     # CASE B: user does NOT exist -> create user + principal (replace if exists)
+ 159 |     user_kwargs = {
+ 160 |         "school_id": school_id,
+ 161 |         "phone": payload.phone,
+ 162 |         "role": "PRINCIPAL",
+ 163 |     }
+ 164 |     if hasattr(User, "is_active"):
+ 165 |         user_kwargs["is_active"] = True
+ 166 |     if payload.email is not None and hasattr(User, "email"):
+ 167 |         user_kwargs["email"] = payload.email
+ 168 | 
+ 169 |     user = User(**user_kwargs)
+ 170 |     db.add(user)
+ 171 |     db.flush()  # user.id now available
+ 172 | 
+ 173 |     if existing_principal:
+ 174 |         # deactivate old principal user (if supported)
+ 175 |         old_user = (
+ 176 |             db.query(User)
+ 177 |             .filter(User.school_id == school_id, User.id == existing_principal.user_id)
+ 178 |             .first()
+ 179 |         )
+ 180 |         if old_user:
+ 181 |             _deactivate_user_if_supported(old_user)
+ 182 | 
+ 183 |         existing_principal.user_id = user.id
+ 184 |         existing_principal.name = payload.name
+ 185 |         db.commit()
+ 186 |         db.refresh(existing_principal)
+ 187 |         return ManagementPrincipalOut(
+ 188 |             principal_id=existing_principal.id,
+ 189 |             user_id=user.id,
+ 190 |             name=existing_principal.name,
+ 191 |             phone=getattr(user, "phone", None),
+ 192 |             email=getattr(user, "email", None),
+ 193 |         )
+ 194 | 
+ 195 |     principal = Principal(school_id=school_id,
+ 196 |                           user_id=user.id, name=payload.name)
+ 197 |     db.add(principal)
+ 198 |     db.commit()
+ 199 |     db.refresh(principal)
+ 200 | 
+ 201 |     return ManagementPrincipalOut(
+ 202 |         principal_id=principal.id,
+ 203 |         user_id=user.id,
+ 204 |         name=principal.name,
+ 205 |         phone=getattr(user, "phone", None),
+ 206 |         email=getattr(user, "email", None),
+ 207 |     )
+
+/app/api/v1/routes/management_teachers.py:
+--------------------------------------------------------------------------------
+   1 | from __future__ import annotations
+   2 | import re
+   3 | 
+   4 | from fastapi import APIRouter, Depends, HTTPException, Response, status
+   5 | from pydantic import BaseModel, ConfigDict, Field, model_validator
+   6 | from sqlalchemy.orm import Session
+   7 | 
+   8 | from app.api.v1.deps import get_db, require_management
+   9 | from app.db.models.teacher import Teacher
+  10 | # keep this import path consistent with your project
+  11 | from app.db.models.user import User
+  12 | 
+  13 | router = APIRouter(prefix="/management/teachers", tags=["management-teachers"])
+  14 | 
+  15 | 
+  16 | EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+  17 | 
+  18 | 
+  19 | class ManagementCreateTeacherIn(BaseModel):
+  20 |     model_config = ConfigDict(extra="forbid")
+  21 | 
+  22 |     name: str = Field(min_length=1, max_length=200)
+  23 |     email: str | None = Field(default=None, min_length=5, max_length=255)
+  24 |     phone: str | None = Field(default=None, min_length=10, max_length=20)
+  25 |     # keep if you want, but must NOT be sent; or remove field entirely
+  26 |     role: str | None = None
+  27 | 
+  28 |     @model_validator(mode="after")
+  29 |     def validate_contact(self) -> "ManagementCreateTeacherIn":
+  30 |         # require at least one of email/phone
+  31 |         if (self.email is None or self.email.strip() == "") and (
+  32 |             self.phone is None or self.phone.strip() == ""
+  33 |         ):
+  34 |             raise ValueError("email_or_phone_required")
+  35 | 
+  36 |         # optional basic email validation
+  37 |         if self.email is not None:
+  38 |             e = self.email.strip()
+  39 |             if not EMAIL_RE.match(e):
+  40 |                 raise ValueError("invalid_email_format")
+  41 |             self.email = e
+  42 | 
+  43 |         # optional phone normalization (trim only)
+  44 |         if self.phone is not None:
+  45 |             self.phone = self.phone.strip()
+  46 | 
+  47 |         return self
+  48 | 
+  49 | 
+  50 | class ManagementCreateTeacherOut(BaseModel):
+  51 |     user_id: int
+  52 |     teacher_id: int
+  53 |     name: str
+  54 |     email: str | None = None
+  55 |     phone: str | None = None
+  56 | 
+  57 |     class Config:
+  58 |         from_attributes = True
+  59 | 
+  60 | 
+  61 | @router.post("", response_model=ManagementCreateTeacherOut, status_code=201)
+  62 | def management_create_teacher(
+  63 |     payload: ManagementCreateTeacherIn,
+  64 |     response: Response,
+  65 |     db: Session = Depends(get_db),
+  66 |     current_user: dict = Depends(require_management),
+  67 | ):
+  68 |     school_id = current_user["school_id"]
+  69 | 
+  70 |     # Idempotency lookup: same school + same email OR same phone
+  71 |     q = db.query(User).filter(User.school_id == school_id)
+  72 | 
+  73 |     candidates = []
+  74 |     if payload.phone:
+  75 |         candidates.append(User.phone == payload.phone)
+  76 | 
+  77 |     existing_user = None
+  78 |     if candidates:
+  79 |         existing_user = q.filter((candidates[0]) if len(
+  80 |             candidates) == 1 else (candidates[0] | candidates[1])).first()
+  81 |         if payload.email:
+  82 |             candidates.append(User.email == payload.email)
+  83 | 
+  84 |     if existing_user:
+  85 |         # Ensure teacher row exists for this user (pilot: 1 user -> 1 teacher)
+  86 |         existing_teacher = (
+  87 |             db.query(Teacher)
+  88 |             .filter(
+  89 |                 Teacher.school_id == school_id,
+  90 |                 Teacher.user_id == existing_user.id,
+  91 |             )
+  92 |             .first()
+  93 |         )
+  94 |         if existing_teacher:
+  95 |             response.status_code = status.HTTP_200_OK
+  96 |             return ManagementCreateTeacherOut(
+  97 |                 user_id=existing_user.id,
+  98 |                 teacher_id=existing_teacher.id,
+  99 |                 name=existing_teacher.name,
+ 100 |                 email=existing_teacher.email,
+ 101 |                 phone=payload.phone,  # phone not stored on Teacher model currently
+ 102 |             )
+ 103 | 
+ 104 |         # User exists but teacher missing -> create teacher row (201)
+ 105 |         teacher = Teacher(
+ 106 |             school_id=school_id,
+ 107 |             user_id=existing_user.id,
+ 108 |             name=payload.name,
+ 109 |         )
+ 110 |         db.add(teacher)
+ 111 |         db.commit()
+ 112 |         db.refresh(teacher)
+ 113 | 
+ 114 |         return ManagementCreateTeacherOut(
+ 115 |             user_id=existing_user.id,
+ 116 |             teacher_id=teacher.id,
+ 117 |             name=teacher.name,
+ 118 |             email=teacher.email,
+ 119 |             phone=payload.phone,
+ 120 |         )
+ 121 | 
+ 122 |     # Create BOTH: User + Teacher (role forced server-side)
+ 123 |     user = User(
+ 124 |         school_id=school_id,
+ 125 |         role="TEACHER",
+ 126 |         email=payload.email,
+ 127 |         phone=payload.phone,
+ 128 |     )
+ 129 |     db.add(user)
+ 130 |     db.flush()  # get user.id for teacher FK without committing yet
+ 131 | 
+ 132 |     teacher = Teacher(
+ 133 |         school_id=school_id,
+ 134 |         user_id=user.id,
+ 135 |         name=payload.name,
+ 136 |     )
+ 137 |     db.add(teacher)
+ 138 | 
+ 139 |     db.commit()
+ 140 |     db.refresh(user)
+ 141 |     db.refresh(teacher)
+ 142 | 
+ 143 |     return ManagementCreateTeacherOut(
+ 144 |         user_id=user.id,
+ 145 |         teacher_id=teacher.id,
+ 146 |         name=teacher.name,
+ 147 |         email=teacher.email,
+ 148 |         phone=payload.phone,
+ 149 |     )
+
+/app/api/v1/routes/marks.py:
+--------------------------------------------------------------------------------
+   1 | import json
+   2 | 
+   3 | from typing import List
+   4 | 
+   5 | from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+   6 | from pydantic import BaseModel, ConfigDict
+   7 | from sqlalchemy.exc import IntegrityError
+   8 | from sqlalchemy.orm import Session
+   9 | 
+  10 | from app.api.v1.deps import get_db, get_current_user
+  11 | from app.db.models.marks_record import MarksRecord
+  12 | from app.db.models.marks_submission import MarksSubmission
+  13 | from app.db.models.notification_outbox import NotificationOutbox
+  14 | from app.db.models.section import Section
+  15 | from app.db.models.student import Student
+  16 | from app.db.models.subject import Subject
+  17 | 
+  18 | router = APIRouter(prefix="/marks", tags=["marks"])
+  19 | 
+  20 | 
+  21 | class MarksRecordIn(BaseModel):
+  22 |     model_config = ConfigDict(extra="forbid")
+  23 | 
+  24 |     student_id: int
+  25 |     subject_id: int
+  26 |     exam_type: str
+  27 |     marks_obtained: int
+  28 |     max_marks: int
+  29 | 
+  30 | 
+  31 | class MarksSubmissionIn(BaseModel):
+  32 |     model_config = ConfigDict(extra="forbid")
+  33 | 
+  34 |     section_id: int
+  35 |     subject_id: int
+  36 |     exam_type: str
+  37 | 
+  38 | 
+  39 | class MarksRecordOut(BaseModel):
+  40 |     id: int
+  41 |     school_id: int
+  42 |     student_id: int
+  43 |     subject_id: int
+  44 |     exam_type: str
+  45 |     marks_obtained: int
+  46 |     max_marks: int
+  47 |     recorded_by_user_id: int | None
+  48 | 
+  49 |     class Config:
+  50 |         from_attributes = True
+  51 | 
+  52 | 
+  53 | class MarksSubmissionOut(BaseModel):
+  54 |     id: int
+  55 |     school_id: int
+  56 |     section_id: int
+  57 |     subject_id: int
+  58 |     exam_type: str
+  59 |     submitted_by_user_id: int | None
+  60 |     status: str
+  61 | 
+  62 |     class Config:
+  63 |         from_attributes = True
+  64 | 
+  65 | 
+  66 | def _enqueue_marks_outbox(
+  67 |     *,
+  68 |     db: Session,
+  69 |     school_id: int,
+  70 |     section_id: int,
+  71 |     subject_id: int,
+  72 |     exam_type: str,
+  73 |     marks_submission_id: int,
+  74 | ) -> None:
+  75 |     students = (
+  76 |         db.query(Student)
+  77 |         .filter(Student.school_id == school_id, Student.section_id == section_id)
+  78 |         .all()
+  79 |     )
+  80 | 
+  81 |     for s in students:
+  82 |         db.add(
+  83 |             NotificationOutbox(
+  84 |                 school_id=school_id,
+  85 |                 event_type="MARKS_SUBMITTED",
+  86 |                 attendance_submission_id=None,
+  87 |                 marks_submission_id=marks_submission_id,
+  88 |                 recipient_phone=s.parent_phone,
+  89 |                 payload=json.dumps(
+  90 |                     {
+  91 |                         "type": "marks_submitted",
+  92 |                         "section_id": section_id,
+  93 |                         "subject_id": subject_id,
+  94 |                         "exam_type": exam_type,
+  95 |                         "student_id": s.id,
+  96 |                     }
+  97 |                 ),
+  98 |                 status="PENDING",
+  99 |                 attempts=0,
+ 100 |             )
+ 101 |         )
+ 102 | 
+ 103 | 
+ 104 | @router.post("/record", response_model=MarksRecordOut, status_code=201)
+ 105 | def record_marks(
+ 106 |     payload: MarksRecordIn,
+ 107 |     response: Response,
+ 108 |     db: Session = Depends(get_db),
+ 109 |     current_user: dict = Depends(get_current_user),
+ 110 | ):
+ 111 |     # Validate references belong to same school
+ 112 |     student = (
+ 113 |         db.query(Student)
+ 114 |         .filter(
+ 115 |             Student.id == payload.student_id,
+ 116 |             Student.school_id == current_user["school_id"],
+ 117 |         )
+ 118 |         .first()
+ 119 |     )
+ 120 |     if not student:
+ 121 |         raise HTTPException(status_code=400, detail="invalid_student_id")
+ 122 | 
+ 123 |     subject = (
+ 124 |         db.query(Subject)
+ 125 |         .filter(
+ 126 |             Subject.id == payload.subject_id,
+ 127 |             Subject.school_id == current_user["school_id"],
+ 128 |         )
+ 129 |         .first()
+ 130 |     )
+ 131 |     if not subject:
+ 132 |         raise HTTPException(status_code=400, detail="invalid_subject_id")
+ 133 | 
+ 134 |     row = MarksRecord(
+ 135 |         school_id=current_user["school_id"],
+ 136 |         student_id=payload.student_id,
+ 137 |         subject_id=payload.subject_id,
+ 138 |         exam_type=payload.exam_type,
+ 139 |         marks_obtained=payload.marks_obtained,
+ 140 |         max_marks=payload.max_marks,
+ 141 |         recorded_by_user_id=current_user["user_id"],
+ 142 |     )
+ 143 |     db.add(row)
+ 144 | 
+ 145 |     try:
+ 146 |         db.commit()
+ 147 |     except IntegrityError:
+ 148 |         db.rollback()
+ 149 | 
+ 150 |         existing = (
+ 151 |             db.query(MarksRecord)
+ 152 |             .filter(
+ 153 |                 MarksRecord.school_id == current_user["school_id"],
+ 154 |                 MarksRecord.student_id == payload.student_id,
+ 155 |                 MarksRecord.subject_id == payload.subject_id,
+ 156 |                 MarksRecord.exam_type == payload.exam_type,
+ 157 |             )
+ 158 |             .first()
+ 159 |         )
+ 160 |         if (
+ 161 |             existing
+ 162 |             and existing.marks_obtained == payload.marks_obtained
+ 163 |             and existing.max_marks == payload.max_marks
+ 164 |         ):
+ 165 |             response.status_code = status.HTTP_200_OK
+ 166 |             return existing
+ 167 | 
+ 168 |         raise HTTPException(
+ 169 |             status_code=status.HTTP_409_CONFLICT,
+ 170 |             detail="conflicting_marks",
+ 171 |         )
+ 172 | 
+ 173 |     db.refresh(row)
+ 174 |     return row
+ 175 | 
+ 176 | 
+ 177 | @router.post("/submit", response_model=MarksSubmissionOut, status_code=201)
+ 178 | def submit_marks(
+ 179 |     payload: MarksSubmissionIn,
+ 180 |     response: Response,
+ 181 |     db: Session = Depends(get_db),
+ 182 |     current_user: dict = Depends(get_current_user),
+ 183 | ):
+ 184 |     # Validate section + subject belong to same school
+ 185 |     sec = (
+ 186 |         db.query(Section)
+ 187 |         .filter(
+ 188 |             Section.id == payload.section_id,
+ 189 |             Section.school_id == current_user["school_id"],
+ 190 |         )
+ 191 |         .first()
+ 192 |     )
+ 193 |     if not sec:
+ 194 |         raise HTTPException(status_code=400, detail="invalid_section_id")
+ 195 | 
+ 196 |     subject = (
+ 197 |         db.query(Subject)
+ 198 |         .filter(
+ 199 |             Subject.id == payload.subject_id,
+ 200 |             Subject.school_id == current_user["school_id"],
+ 201 |         )
+ 202 |         .first()
+ 203 |     )
+ 204 |     if not subject:
+ 205 |         raise HTTPException(status_code=400, detail="invalid_subject_id")
+ 206 | 
+ 207 |     row = MarksSubmission(
+ 208 |         school_id=current_user["school_id"],
+ 209 |         section_id=payload.section_id,
+ 210 |         subject_id=payload.subject_id,
+ 211 |         exam_type=payload.exam_type,
+ 212 |         submitted_by_user_id=current_user["user_id"],
+ 213 |         status="submitted",
+ 214 |     )
+ 215 |     db.add(row)
+ 216 | 
+ 217 |     try:
+ 218 |         # flush so row.id is available before enqueue
+ 219 |         db.flush()
+ 220 | 
+ 221 |         # recipients = all students in the submitted section for this school
+ 222 |         students = (
+ 223 |             db.query(Student)
+ 224 |             .filter(
+ 225 |                 Student.school_id == current_user["school_id"],
+ 226 |                 Student.section_id == payload.section_id,
+ 227 |             )
+ 228 |             .all()
+ 229 |         )
+ 230 |         # enqueue outbox rows (deduped by unique constraint)
+ 231 |         for s in students:
+ 232 |             db.add(
+ 233 |                 NotificationOutbox(
+ 234 |                     school_id=current_user["school_id"],
+ 235 |                     event_type="MARKS_SUBMITTED",
+ 236 |                     attendance_submission_id=None,
+ 237 |                     marks_submission_id=row.id,
+ 238 |                     recipient_phone=s.parent_phone,
+ 239 |                     payload=json.dumps(
+ 240 |                         {
+ 241 |                             "type": "marks_submitted",
+ 242 |                             "section_id": payload.section_id,
+ 243 |                             "subject_id": payload.subject_id,
+ 244 |                             "exam_type": payload.exam_type,
+ 245 |                             "student_id": s.id,
+ 246 |                         }
+ 247 |                     ),
+ 248 |                     status="PENDING",
+ 249 |                     attempts=0,
+ 250 |                 )
+ 251 |             )
+ 252 | 
+ 253 |         db.commit()
+ 254 |     except IntegrityError:
+ 255 |         db.rollback()
+ 256 | 
+ 257 |         existing = (
+ 258 |             db.query(MarksSubmission)
+ 259 |             .filter(
+ 260 |                 MarksSubmission.school_id == current_user["school_id"],
+ 261 |                 MarksSubmission.section_id == payload.section_id,
+ 262 |                 MarksSubmission.subject_id == payload.subject_id,
+ 263 |                 MarksSubmission.exam_type == payload.exam_type,
+ 264 |             )
+ 265 |             .first()
+ 266 |         )
+ 267 |         if existing:
+ 268 |             # Idempotent submit: ensure outbox exists (dedupe handled by DB uniqueness)
+ 269 |             _enqueue_marks_outbox(
+ 270 |                 db=db,
+ 271 |                 school_id=current_user["school_id"],
+ 272 |                 section_id=payload.section_id,
+ 273 |                 subject_id=payload.subject_id,
+ 274 |                 exam_type=payload.exam_type,
+ 275 |                 marks_submission_id=existing.id,
+ 276 |             )
+ 277 |             db.commit()
+ 278 |             response.status_code = status.HTTP_200_OK
+ 279 |             return existing
+ 280 | 
+ 281 |         raise HTTPException(status_code=409, detail="already_submitted")
+ 282 | 
+ 283 |     db.refresh(row)
+ 284 |     return row
+ 285 | 
+ 286 | 
+ 287 | @router.get("", response_model=List[MarksRecordOut])
+ 288 | def list_marks(
+ 289 |     section_id: int = Query(...),
+ 290 |     subject_id: int = Query(...),
+ 291 |     exam_type: str = Query(...),
+ 292 |     db: Session = Depends(get_db),
+ 293 |     current_user: dict = Depends(get_current_user),
+ 294 | ):
+ 295 |     # Validate section + subject belong to same school (tenant isolation)
+ 296 |     sec = (
+ 297 |         db.query(Section)
+ 298 |         .filter(
+ 299 |             Section.id == section_id,
+ 300 |             Section.school_id == current_user["school_id"],
+ 301 |         )
+ 302 |         .first()
+ 303 |     )
+ 304 |     if not sec:
+ 305 |         raise HTTPException(status_code=400, detail="invalid_section_id")
+ 306 | 
+ 307 |     subject = (
+ 308 |         db.query(Subject)
+ 309 |         .filter(
+ 310 |             Subject.id == subject_id,
+ 311 |             Subject.school_id == current_user["school_id"],
+ 312 |         )
+ 313 |         .first()
+ 314 |     )
+ 315 |     if not subject:
+ 316 |         raise HTTPException(status_code=400, detail="invalid_subject_id")
+ 317 | 
+ 318 |     # NOTE: Without student↔section enrollment mapping, we can only return
+ 319 |     # marks scoped by school+subject+exam_type. Section validation prevents cross-tenant access.
+ 320 |     return (
+ 321 |         db.query(MarksRecord)
+ 322 |         .filter(
+ 323 |             MarksRecord.school_id == current_user["school_id"],
+ 324 |             MarksRecord.subject_id == subject_id,
+ 325 |             MarksRecord.exam_type == exam_type,
+ 326 |         )
+ 327 |         .order_by(MarksRecord.id.asc())
+ 328 |         .all()
+ 329 |     )
+
+/app/api/v1/routes/notifications.py:
+--------------------------------------------------------------------------------
+   1 | from fastapi import APIRouter, Depends
+   2 | from pydantic import BaseModel, ConfigDict
+   3 | from sqlalchemy.orm import Session
+   4 | 
+   5 | from app.api.v1.deps import get_db, require_management
+   6 | from app.workers.outbox_worker import process_outbox_batch
+   7 | 
+   8 | router = APIRouter(prefix="/notifications", tags=["notifications"])
+   9 | 
+  10 | 
+  11 | class OutboxRunOut(BaseModel):
+  12 |     model_config = ConfigDict(extra="forbid")
+  13 | 
+  14 |     processed: int
+  15 | 
+  16 | 
+  17 | @router.post("/outbox/run", response_model=OutboxRunOut)
+  18 | def run_outbox_worker(
+  19 |     db: Session = Depends(get_db),
+  20 |     _user: dict = Depends(require_management),
+  21 | ):
+  22 |     processed = process_outbox_batch(db, limit=50)
+  23 |     return OutboxRunOut(processed=processed)
+
+/app/api/v1/routes/schools.py:
+--------------------------------------------------------------------------------
+   1 | from typing import List
+   2 | 
+   3 | from fastapi import APIRouter, Depends, HTTPException, status
+   4 | from pydantic import BaseModel
+   5 | from sqlalchemy.orm import Session
+   6 | 
+   7 | from app.api.v1.deps import get_db, get_current_user
+   8 | from app.db.models.school import School
+   9 | 
+  10 | router = APIRouter(prefix="/schools", tags=["schools"])
+  11 | 
+  12 | 
+  13 | class SchoolCreate(BaseModel):
+  14 |     name: str
+  15 | 
+  16 | 
+  17 | class SchoolOut(BaseModel):
+  18 |     id: int
+  19 |     name: str
+  20 | 
+  21 |     class Config:
+  22 |         from_attributes = True  # allow returning SQLAlchemy ORM objects
+  23 | 
+  24 | 
+  25 | @router.get("", response_model=List[SchoolOut])
+  26 | def list_schools(
+  27 |     db: Session = Depends(get_db),
+  28 |     _current_user: dict = Depends(get_current_user),
+  29 | 
+  30 | ):
+  31 |     return db.query(School).order_by(School.id.asc()).all()
+  32 | 
+  33 | 
+  34 | @router.post("", response_model=SchoolOut, status_code=201)
+  35 | def create_school(
+  36 |     payload: SchoolCreate,
+  37 |     db: Session = Depends(get_db),
+  38 |     current_user: dict = Depends(get_current_user),
+  39 | ):
+  40 |     if current_user["role"] != "MANAGEMENT":
+  41 |         raise HTTPException(
+  42 |             status_code=status.HTTP_403_FORBIDDEN,
+  43 |             detail="insufficient_permissions",
+  44 |         )
+  45 | 
+  46 |     school = School(name=payload.name)
+  47 |     db.add(school)
+  48 |     db.commit()
+  49 |     db.refresh(school)
+  50 |     return school
+
+/app/api/v1/routes/sections.py:
+--------------------------------------------------------------------------------
+   1 | from typing import List
+   2 | 
+   3 | from fastapi import APIRouter, Depends, HTTPException, status
+   4 | from pydantic import BaseModel, ConfigDict
+   5 | from sqlalchemy.orm import Session
+   6 | 
+   7 | from app.api.v1.deps import get_db, get_current_user
+   8 | from app.db.models.class_ import Class
+   9 | from app.db.models.section import Section
+  10 | 
+  11 | router = APIRouter(prefix="/sections", tags=["sections"])
+  12 | 
+  13 | 
+  14 | class SectionCreate(BaseModel):
+  15 |     model_config = ConfigDict(extra="forbid")
+  16 | 
+  17 |     class_id: int
+  18 |     name: str
+  19 | 
+  20 | 
+  21 | class SectionOut(BaseModel):
+  22 |     id: int
+  23 |     school_id: int
+  24 |     class_id: int
+  25 |     name: str
+  26 | 
+  27 |     class Config:
+  28 |         from_attributes = True
+  29 | 
+  30 | 
+  31 | @router.get("", response_model=List[SectionOut])
+  32 | def list_sections(
+  33 |     db: Session = Depends(get_db),
+  34 |     current_user: dict = Depends(get_current_user),
+  35 | ):
+  36 |     return (
+  37 |         db.query(Section)
+  38 |         .filter(Section.school_id == current_user["school_id"])
+  39 |         .order_by(Section.id.asc())
+  40 |         .all()
+  41 |     )
+  42 | 
+  43 | 
+  44 | @router.post("", response_model=SectionOut, status_code=201)
+  45 | def create_section(
+  46 |     payload: SectionCreate,
+  47 |     db: Session = Depends(get_db),
+  48 |     current_user: dict = Depends(get_current_user),
+  49 | ):
+  50 |     # Ensure the class exists and belongs to the same school (tenant isolation)
+  51 |     cls = (
+  52 |         db.query(Class)
+  53 |         .filter(
+  54 |             Class.id == payload.class_id,
+  55 |             Class.school_id == current_user["school_id"],
+  56 |         )
+  57 |         .first()
+  58 |     )
+  59 |     if not cls:
+  60 |         raise HTTPException(
+  61 |             status_code=status.HTTP_400_BAD_REQUEST,
+  62 |             detail="invalid_class_id",
+  63 |         )
+  64 | 
+  65 |     row = Section(
+  66 |         school_id=current_user["school_id"],
+  67 |         class_id=payload.class_id,
+  68 |         name=payload.name,
+  69 |     )
+  70 |     db.add(row)
+  71 |     db.commit()
+  72 |     db.refresh(row)
+  73 |     return row
+
+/app/api/v1/routes/student_notes.py:
+--------------------------------------------------------------------------------
+   1 | from datetime import datetime
+   2 | from fastapi import APIRouter, Depends, HTTPException, status
+   3 | from pydantic import BaseModel, ConfigDict
+   4 | from sqlalchemy.orm import Session
+   5 | 
+   6 | from app.api.v1.deps import get_db, get_current_user, require_teacher_or_management_or_principal
+   7 | from app.db.models.student import Student
+   8 | from app.db.models.student_note import StudentNote
+   9 | 
+  10 | router = APIRouter(prefix="/students", tags=["student-notes"])
+  11 | 
+  12 | 
+  13 | class StudentNoteCreate(BaseModel):
+  14 |     model_config = ConfigDict(extra="forbid")
+  15 |     note_text: str
+  16 | 
+  17 | 
+  18 | class StudentNoteOut(BaseModel):
+  19 |     id: int
+  20 |     school_id: int
+  21 |     student_id: int
+  22 |     author_user_id: int | None
+  23 |     note_text: str
+  24 |     created_at: datetime  # Changed from str to datetime
+  25 | 
+  26 |     class Config:
+  27 |         from_attributes = True
+  28 | 
+  29 | 
+  30 | @router.post("/{student_id}/notes", response_model=StudentNoteOut, status_code=201)
+  31 | def create_student_note(
+  32 |     student_id: int,
+  33 |     payload: StudentNoteCreate,
+  34 |     db: Session = Depends(get_db),
+  35 |     current_user: dict = Depends(require_teacher_or_management_or_principal),
+  36 | ):
+  37 |     if not payload.note_text.strip():
+  38 |         raise HTTPException(status_code=422, detail="note_text_required")
+  39 | 
+  40 |     student = (
+  41 |         db.query(Student)
+  42 |         .filter(
+  43 |             Student.id == student_id,
+  44 |             Student.school_id == current_user["school_id"],
+  45 |         )
+  46 |         .first()
+  47 |     )
+  48 |     if not student:
+  49 |         raise HTTPException(status_code=400, detail="invalid_student_id")
+  50 | 
+  51 |     note = StudentNote(
+  52 |         school_id=current_user["school_id"],
+  53 |         student_id=student_id,
+  54 |         author_user_id=current_user["user_id"],
+  55 |         note_text=payload.note_text,
+  56 |     )
+  57 |     db.add(note)
+  58 |     db.commit()
+  59 |     db.refresh(note)
+  60 |     return note
+  61 | 
+  62 | 
+  63 | @router.get("/{student_id}/notes", response_model=list[StudentNoteOut])
+  64 | def list_student_notes(
+  65 |     student_id: int,
+  66 |     db: Session = Depends(get_db),
+  67 |     current_user: dict = Depends(require_teacher_or_management_or_principal),
+  68 | ):
+  69 |     student = (
+  70 |         db.query(Student)
+  71 |         .filter(
+  72 |             Student.id == student_id,
+  73 |             Student.school_id == current_user["school_id"],
+  74 |         )
+  75 |         .first()
+  76 |     )
+  77 |     if not student:
+  78 |         raise HTTPException(status_code=400, detail="invalid_student_id")
+  79 | 
+  80 |     return (
+  81 |         db.query(StudentNote)
+  82 |         .filter(
+  83 |             StudentNote.school_id == current_user["school_id"],
+  84 |             StudentNote.student_id == student_id,
+  85 |         )
+  86 |         .order_by(StudentNote.created_at.desc())
+  87 |         .all()
+  88 |     )
+
+/app/api/v1/routes/students.py:
+--------------------------------------------------------------------------------
+   1 | from typing import List
+   2 | 
+   3 | from fastapi import APIRouter, Depends, HTTPException, Query
+   4 | from pydantic import BaseModel, ConfigDict
+   5 | from sqlalchemy.orm import Session
+   6 | 
+   7 | from app.api.v1.deps import get_current_user, get_db
+   8 | from app.db.models.section import Section
+   9 | from app.db.models.student import Student
+  10 | 
+  11 | router = APIRouter(prefix="/students", tags=["students"])
+  12 | 
+  13 | 
+  14 | class StudentCreate(BaseModel):
+  15 |     model_config = ConfigDict(extra="forbid")
+  16 |     name: str
+  17 | 
+  18 | 
+  19 | class StudentOut(BaseModel):
+  20 |     id: int
+  21 |     school_id: int
+  22 |     name: str
+  23 | 
+  24 |     class Config:
+  25 |         from_attributes = True
+  26 | 
+  27 | 
+  28 | @router.get("", response_model=List[StudentOut])
+  29 | def list_students(
+  30 |     section_id: int | None = Query(None),
+  31 |     db: Session = Depends(get_db),
+  32 |     current_user: dict = Depends(get_current_user),
+  33 | ):
+  34 |     q = db.query(Student).filter(
+  35 |         Student.school_id == current_user["school_id"])
+  36 | 
+  37 |     if section_id is not None:
+  38 |         sec = (
+  39 |             db.query(Section)
+  40 |             .filter(
+  41 |                 Section.id == section_id,
+  42 |                 Section.school_id == current_user["school_id"],
+  43 |             )
+  44 |             .first()
+  45 |         )
+  46 |         if not sec:
+  47 |             raise HTTPException(status_code=400, detail="invalid_section_id")
+  48 | 
+  49 |         q = q.filter(Student.section_id == section_id)
+  50 | 
+  51 |     return q.order_by(Student.id.asc()).all()
+  52 | 
+  53 | 
+  54 | @router.post("", response_model=StudentOut, status_code=201)
+  55 | def create_student(
+  56 |     payload: StudentCreate,
+  57 |     db: Session = Depends(get_db),
+  58 |     current_user: dict = Depends(get_current_user),
+  59 | ):
+  60 |     student = Student(
+  61 |         school_id=current_user["school_id"],
+  62 |         name=payload.name,
+  63 |     )
+  64 |     db.add(student)
+  65 |     db.commit()
+  66 |     db.refresh(student)
+  67 |     return student
+
+/app/api/v1/routes/subjects.py:
+--------------------------------------------------------------------------------
+   1 | from typing import List, Optional
+   2 | 
+   3 | from fastapi import APIRouter, Depends
+   4 | from pydantic import BaseModel, ConfigDict
+   5 | from sqlalchemy.orm import Session
+   6 | 
+   7 | from app.api.v1.deps import get_db, get_current_user
+   8 | from app.db.models.subject import Subject
+   9 | 
+  10 | router = APIRouter(prefix="/subjects", tags=["subjects"])
+  11 | 
+  12 | 
+  13 | class SubjectCreate(BaseModel):
+  14 |     model_config = ConfigDict(extra="forbid")
+  15 | 
+  16 |     name: str
+  17 | 
+  18 | 
+  19 | class SubjectOut(BaseModel):
+  20 |     id: int
+  21 |     school_id: int
+  22 |     name: str
+  23 | 
+  24 |     class Config:
+  25 |         from_attributes = True
+  26 | 
+  27 | 
+  28 | @router.get("", response_model=List[SubjectOut])
+  29 | def list_subjects(
+  30 |     db: Session = Depends(get_db),
+  31 |     current_user: dict = Depends(get_current_user),
+  32 | ):
+  33 |     return (
+  34 |         db.query(Subject)
+  35 |         .filter(Subject.school_id == current_user["school_id"])
+  36 |         .order_by(Subject.id.asc())
+  37 |         .all()
+  38 |     )
+  39 | 
+  40 | 
+  41 | @router.post("", response_model=SubjectOut, status_code=201)
+  42 | def create_subject(
+  43 |     payload: SubjectCreate,
+  44 |     db: Session = Depends(get_db),
+  45 |     current_user: dict = Depends(get_current_user),
+  46 | ):
+  47 |     row = Subject(
+  48 |         school_id=current_user["school_id"],
+  49 |         name=payload.name,
+  50 |     )
+  51 |     db.add(row)
+  52 |     db.commit()
+  53 |     db.refresh(row)
+  54 |     return row
+
+/app/api/v1/routes/teacher_me.py:
+--------------------------------------------------------------------------------
+   1 | from fastapi import APIRouter, Depends, HTTPException, status
+   2 | from pydantic import BaseModel
+   3 | from sqlalchemy.orm import Session
+   4 | 
+   5 | from app.api.v1.deps import get_db, require_teacher
+   6 | from app.db.models.teacher import Teacher
+   7 | from app.db.models.teacher_primary_section import TeacherPrimarySection
+   8 | from app.db.models.section import Section
+   9 | # adjust import if your class model name differs
+  10 | from app.db.models.class_ import Class
+  11 | 
+  12 | router = APIRouter(prefix="/teacher/me", tags=["teacher"])
+  13 | 
+  14 | 
+  15 | class TeacherAttendanceSectionOut(BaseModel):
+  16 |     section_id: int
+  17 |     section_name: str
+  18 |     class_id: int
+  19 |     class_name: str
+  20 | 
+  21 | 
+  22 | @router.get("/attendance-section", response_model=TeacherAttendanceSectionOut)
+  23 | def get_attendance_section(
+  24 |     db: Session = Depends(get_db),
+  25 |     current_user: dict = Depends(require_teacher),
+  26 | ):
+  27 |     # Resolve Teacher row for this user+school.
+  28 |     # Mapping: teachers.id == users.id for TEACHER users.
+  29 |     teacher = (
+  30 |         db.query(Teacher)
+  31 |         .filter(
+  32 |             Teacher.school_id == current_user["school_id"],
+  33 |             Teacher.id == current_user["user_id"],
+  34 |         )
+  35 |         .first()
+  36 |     )
+  37 |     if not teacher:
+  38 |         raise HTTPException(status_code=404, detail="teacher_not_found")
+  39 | 
+  40 |     mapping = (
+  41 |         db.query(TeacherPrimarySection)
+  42 |         .filter(
+  43 |             TeacherPrimarySection.school_id == current_user["school_id"],
+  44 |             TeacherPrimarySection.teacher_id == teacher.id,
+  45 |         )
+  46 |         .first()
+  47 |     )
+  48 |     if not mapping:
+  49 |         raise HTTPException(
+  50 |             status_code=404, detail="no_primary_section_assigned")
+  51 | 
+  52 |     sec = (
+  53 |         db.query(Section)
+  54 |         .filter(
+  55 |             Section.school_id == current_user["school_id"],
+  56 |             Section.id == mapping.section_id,
+  57 |         )
+  58 |         .first()
+  59 |     )
+  60 |     if not sec:
+  61 |         raise HTTPException(status_code=400, detail="invalid_section_id")
+  62 | 
+  63 |     cls = (
+  64 |         db.query(Class)
+  65 |         .filter(
+  66 |             Class.school_id == current_user["school_id"],
+  67 |             Class.id == sec.class_id,
+  68 |         )
+  69 |         .first()
+  70 |     )
+  71 |     if not cls:
+  72 |         raise HTTPException(status_code=400, detail="invalid_class_id")
+  73 | 
+  74 |     return TeacherAttendanceSectionOut(
+  75 |         section_id=sec.id,
+  76 |         section_name=sec.name,
+  77 |         class_id=cls.id,
+  78 |         class_name=cls.name,
+  79 |     )
+
+/app/api/v1/routes/teachers.py:
+--------------------------------------------------------------------------------
+   1 | from typing import List, Optional
+   2 | 
+   3 | from fastapi import APIRouter, Depends
+   4 | from pydantic import BaseModel, ConfigDict
+   5 | from sqlalchemy.orm import Session
+   6 | 
+   7 | from app.api.v1.deps import get_db, get_current_user
+   8 | from app.db.models.teacher import Teacher
+   9 | 
+  10 | router = APIRouter(prefix="/teachers", tags=["teachers"])
+  11 | 
+  12 | 
+  13 | class TeacherCreate(BaseModel):
+  14 |     model_config = ConfigDict(extra="forbid")
+  15 | 
+  16 |     name: str
+  17 |     email: Optional[str] = None
+  18 | 
+  19 | 
+  20 | class TeacherOut(BaseModel):
+  21 |     id: int
+  22 |     school_id: int
+  23 |     name: str
+  24 |     email: Optional[str] = None
+  25 | 
+  26 |     class Config:
+  27 |         from_attributes = True
+  28 | 
+  29 | 
+  30 | @router.get("", response_model=List[TeacherOut])
+  31 | def list_teachers(
+  32 |     db: Session = Depends(get_db),
+  33 |     current_user: dict = Depends(get_current_user),
+  34 | ):
+  35 |     return (
+  36 |         db.query(Teacher)
+  37 |         .filter(Teacher.school_id == current_user["school_id"])
+  38 |         .order_by(Teacher.id.asc())
+  39 |         .all()
+  40 |     )
+  41 | 
+  42 | 
+  43 | @router.post("", response_model=TeacherOut, status_code=201)
+  44 | def create_teacher(
+  45 |     payload: TeacherCreate,
+  46 |     db: Session = Depends(get_db),
+  47 |     current_user: dict = Depends(get_current_user),
+  48 | ):
+  49 |     teacher = Teacher(
+  50 |         school_id=current_user["school_id"],
+  51 |         name=payload.name,
+  52 |         email=payload.email,
+  53 |     )
+  54 |     db.add(teacher)
+  55 |     db.commit()
+  56 |     db.refresh(teacher)
+  57 |     return teacher
+
+/app/api/v1/routes/teachers_me.py:
+--------------------------------------------------------------------------------
+   1 | from __future__ import annotations
+   2 | 
+   3 | from fastapi import APIRouter, Depends, HTTPException, status
+   4 | from pydantic import BaseModel
+   5 | from sqlalchemy.orm import Session
+   6 | 
+   7 | from app.api.v1.deps import get_db, require_teacher
+   8 | from app.db.models.teacher import Teacher
+   9 | from app.db.models.section_subject_teacher import SectionSubjectTeacher
+  10 | from app.db.models.section import Section
+  11 | from app.db.models.class_ import Class
+  12 | from app.db.models.subject import Subject
+  13 | from app.db.models.user import User  # keep consistent with your project
+  14 | 
+  15 | router = APIRouter(prefix="/teachers/me", tags=["teachers-me"])
+  16 | 
+  17 | 
+  18 | class TeacherMeOut(BaseModel):
+  19 |     teacher_id: int
+  20 |     name: str
+  21 |     email: str | None = None
+  22 |     phone: str | None = None
+  23 | 
+  24 | 
+  25 | class TeachingAssignmentOut(BaseModel):
+  26 |     section_id: int
+  27 |     section_name: str
+  28 |     class_id: int
+  29 |     class_name: str
+  30 |     subject_id: int
+  31 |     subject_name: str
+  32 | 
+  33 | 
+  34 | @router.get("", response_model=TeacherMeOut)
+  35 | def get_my_teacher_profile(
+  36 |     db: Session = Depends(get_db),
+  37 |     current_user: dict = Depends(require_teacher),
+  38 | ):
+  39 |     teacher = (
+  40 |         db.query(Teacher)
+  41 |         .filter(
+  42 |             Teacher.school_id == current_user["school_id"],
+  43 |             Teacher.user_id == current_user["user_id"],
+  44 |         )
+  45 |         .first()
+  46 |     )
+  47 |     if not teacher:
+  48 |         raise HTTPException(status_code=404, detail="teacher_not_found")
+  49 | 
+  50 |     user = db.query(User).filter(User.id == teacher.user_id).first()
+  51 | 
+  52 |     return TeacherMeOut(
+  53 |         teacher_id=teacher.id,
+  54 |         name=teacher.name,
+  55 |         email=getattr(user, "email", None),
+  56 |         phone=getattr(user, "phone", None),
+  57 |     )
+  58 | 
+  59 | 
+  60 | @router.get("/teaching-assignments", response_model=list[TeachingAssignmentOut])
+  61 | def get_my_teaching_assignments(
+  62 |     db: Session = Depends(get_db),
+  63 |     current_user: dict = Depends(require_teacher),
+  64 | ):
+  65 |     teacher = (
+  66 |         db.query(Teacher)
+  67 |         .filter(
+  68 |             Teacher.school_id == current_user["school_id"],
+  69 |             Teacher.user_id == current_user["user_id"],
+  70 |         )
+  71 |         .first()
+  72 |     )
+  73 |     if not teacher:
+  74 |         raise HTTPException(status_code=404, detail="teacher_not_found")
+  75 | 
+  76 |     rows = (
+  77 |         db.query(
+  78 |             SectionSubjectTeacher.section_id,
+  79 |             Section.name.label("section_name"),
+  80 |             Class.id.label("class_id"),
+  81 |             Class.name.label("class_name"),
+  82 |             SectionSubjectTeacher.subject_id,
+  83 |             Subject.name.label("subject_name"),
+  84 |         )
+  85 |         .join(
+  86 |             Section,
+  87 |             (Section.id == SectionSubjectTeacher.section_id)
+  88 |             & (Section.school_id == current_user["school_id"]),
+  89 |         )
+  90 |         .join(
+  91 |             Class,
+  92 |             (Class.id == Section.class_id) & (
+  93 |                 Class.school_id == current_user["school_id"]),
+  94 |         )
+  95 |         .join(
+  96 |             Subject,
+  97 |             (Subject.id == SectionSubjectTeacher.subject_id)
+  98 |             & (Subject.school_id == current_user["school_id"]),
+  99 |         )
+ 100 |         .filter(
+ 101 |             SectionSubjectTeacher.school_id == current_user["school_id"],
+ 102 |             SectionSubjectTeacher.teacher_id == teacher.id,
+ 103 |         )
+ 104 |         .order_by(SectionSubjectTeacher.id.asc())
+ 105 |         .all()
+ 106 |     )
+ 107 | 
+ 108 |     return [
+ 109 |         TeachingAssignmentOut(
+ 110 |             section_id=r.section_id,
+ 111 |             section_name=r.section_name,
+ 112 |             class_id=r.class_id,
+ 113 |             class_name=r.class_name,
+ 114 |             subject_id=r.subject_id,
+ 115 |             subject_name=r.subject_name,
+ 116 |         )
+ 117 |         for r in rows
+ 118 |     ]
+
+/app/api/v1/routes/teaching_assignments.py:
+--------------------------------------------------------------------------------
+   1 | from typing import List
+   2 | 
+   3 | from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+   4 | from pydantic import BaseModel, ConfigDict
+   5 | from sqlalchemy.exc import IntegrityError
+   6 | from sqlalchemy.orm import Session
+   7 | 
+   8 | from app.api.v1.deps import get_current_user, get_db, require_management
+   9 | from app.db.models.section import Section
+  10 | from app.db.models.subject import Subject
+  11 | from app.db.models.teacher import Teacher
+  12 | from app.db.models.section_subject_teacher import SectionSubjectTeacher
+  13 | 
+  14 | router = APIRouter(prefix="/teaching-assignments",
+  15 |                    tags=["teaching-assignments"])
+  16 | 
+  17 | 
+  18 | class TeachingAssignmentCreate(BaseModel):
+  19 |     model_config = ConfigDict(extra="forbid")
+  20 | 
+  21 |     section_id: int
+  22 |     subject_id: int
+  23 |     teacher_id: int
+  24 | 
+  25 | 
+  26 | class TeachingAssignmentOut(BaseModel):
+  27 |     id: int
+  28 |     school_id: int
+  29 |     section_id: int
+  30 |     subject_id: int
+  31 |     teacher_id: int
+  32 | 
+  33 |     class Config:
+  34 |         from_attributes = True
+  35 | 
+  36 | 
+  37 | @router.post("", response_model=TeachingAssignmentOut, status_code=201)
+  38 | def create_teaching_assignment(
+  39 |     payload: TeachingAssignmentCreate,
+  40 |     response: Response,
+  41 |     db: Session = Depends(get_db),
+  42 |     current_user: dict = Depends(require_management),
+  43 | ):
+  44 |     # Validate references belong to same tenant (school)
+  45 |     sec = (
+  46 |         db.query(Section)
+  47 |         .filter(
+  48 |             Section.id == payload.section_id,
+  49 |             Section.school_id == current_user["school_id"],
+  50 |         )
+  51 |         .first()
+  52 |     )
+  53 |     if not sec:
+  54 |         raise HTTPException(status_code=400, detail="invalid_reference")
+  55 | 
+  56 |     subj = (
+  57 |         db.query(Subject)
+  58 |         .filter(
+  59 |             Subject.id == payload.subject_id,
+  60 |             Subject.school_id == current_user["school_id"],
+  61 |         )
+  62 |         .first()
+  63 |     )
+  64 |     if not subj:
+  65 |         raise HTTPException(status_code=400, detail="invalid_reference")
+  66 | 
+  67 |     t = (
+  68 |         db.query(Teacher)
+  69 |         .filter(
+  70 |             Teacher.id == payload.teacher_id,
+  71 |             Teacher.school_id == current_user["school_id"],
+  72 |         )
+  73 |         .first()
+  74 |     )
+  75 |     if not t:
+  76 |         raise HTTPException(status_code=400, detail="invalid_reference")
+  77 | 
+  78 |     row = SectionSubjectTeacher(
+  79 |         school_id=current_user["school_id"],
+  80 |         section_id=payload.section_id,
+  81 |         subject_id=payload.subject_id,
+  82 |         teacher_id=payload.teacher_id,
+  83 |     )
+  84 |     db.add(row)
+  85 | 
+  86 |     try:
+  87 |         db.commit()
+  88 |     except IntegrityError:
+  89 |         db.rollback()
+  90 | 
+  91 |         existing = (
+  92 |             db.query(SectionSubjectTeacher)
+  93 |             .filter(
+  94 |                 SectionSubjectTeacher.school_id == current_user["school_id"],
+  95 |                 SectionSubjectTeacher.section_id == payload.section_id,
+  96 |                 SectionSubjectTeacher.subject_id == payload.subject_id,
+  97 |             )
+  98 |             .first()
+  99 |         )
+ 100 |         if existing and existing.teacher_id == payload.teacher_id:
+ 101 |             response.status_code = status.HTTP_200_OK
+ 102 |             return existing
+ 103 | 
+ 104 |         raise HTTPException(status_code=409, detail="assignment_conflict")
+ 105 | 
+ 106 |     db.refresh(row)
+ 107 |     return row
+ 108 | 
+ 109 | 
+ 110 | @router.get("", response_model=List[TeachingAssignmentOut])
+ 111 | def list_teaching_assignments(
+ 112 |     section_id: int | None = Query(None),
+ 113 |     teacher_id: int | None = Query(None),
+ 114 |     db: Session = Depends(get_db),
+ 115 |     current_user: dict = Depends(get_current_user),
+ 116 | ):
+ 117 |     q = db.query(SectionSubjectTeacher).filter(
+ 118 |         SectionSubjectTeacher.school_id == current_user["school_id"]
+ 119 |     )
+ 120 | 
+ 121 |     if section_id is not None:
+ 122 |         sec = (
+ 123 |             db.query(Section)
+ 124 |             .filter(
+ 125 |                 Section.id == section_id,
+ 126 |                 Section.school_id == current_user["school_id"],
+ 127 |             )
+ 128 |             .first()
+ 129 |         )
+ 130 |         if not sec:
+ 131 |             raise HTTPException(status_code=400, detail="invalid_section_id")
+ 132 |         q = q.filter(SectionSubjectTeacher.section_id == section_id)
+ 133 | 
+ 134 |     if teacher_id is not None:
+ 135 |         t = (
+ 136 |             db.query(Teacher)
+ 137 |             .filter(
+ 138 |                 Teacher.id == teacher_id,
+ 139 |                 Teacher.school_id == current_user["school_id"],
+ 140 |             )
+ 141 |             .first()
+ 142 |         )
+ 143 |         if not t:
+ 144 |             raise HTTPException(status_code=400, detail="invalid_teacher_id")
+ 145 |         q = q.filter(SectionSubjectTeacher.teacher_id == teacher_id)
+ 146 | 
+ 147 |     return q.order_by(SectionSubjectTeacher.id.asc()).all()
+
+/app/db/__init__.py:
+--------------------------------------------------------------------------------
+   1 | 
+
+/app/db/base.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy.orm import DeclarativeBase
+   2 | 
+   3 | 
+   4 | class Base(DeclarativeBase):
+   5 |     """
+   6 |     Central SQLAlchemy Declarative Base.
+   7 | 
+   8 |     Why this exists:
+   9 |     - All ORM models must inherit from this Base
+  10 |     - Alembic uses this to auto-detect schema changes
+  11 |     - Keeps model metadata centralized and consistent
+  12 |     """
+  13 |     pass
+
+/app/db/models/__init__.py:
+--------------------------------------------------------------------------------
+   1 | from app.db.models.school import School  # noqa: F401
+   2 | from app.db.models.teacher import Teacher  # noqa: F401
+   3 | from app.db.models.user import User  # noqa: F401
+   4 | from app.db.models.otp_request import OtpRequest  # noqa: F401
+   5 | from app.db.models.student import Student  # noqa: F401
+   6 | from app.db.models.class_ import Class  # noqa: F401
+   7 | from app.db.models.section import Section  # noqa: F401
+   8 | from app.db.models.attendance_record import AttendanceRecord  # noqa: F401
+   9 | from app.db.models.attendance_submission import AttendanceSubmission  # noqa: F401
+  10 | from app.db.models.notification_outbox import NotificationOutbox  # noqa: F401
+  11 | from app.db.models.subject import Subject  # noqa: F401
+  12 | from app.db.models.marks_record import MarksRecord  # noqa: F401
+  13 | from app.db.models.marks_submission import MarksSubmission  # noqa: F401
+  14 | from app.db.models.notification_outbox import NotificationOutbox  # noqa: F401
+  15 | from app.db.models.teacher_primary_section import TeacherPrimarySection
+  16 | from app.db.models.section_subject_teacher import SectionSubjectTeacher
+
+/app/db/models/attendance_record.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import Date, DateTime, ForeignKey, Index, String, UniqueConstraint, func
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class AttendanceRecord(Base):
+   8 |     __tablename__ = "attendance_records"
+   9 | 
+  10 |     __table_args__ = (
+  11 |         UniqueConstraint("school_id", "student_id", "date",
+  12 |                          name="uq_attendance_school_student_date"),
+  13 |         Index("ix_attendance_school_date", "school_id", "date"),
+  14 |         Index("ix_attendance_school_student", "school_id", "student_id"),
+  15 |     )
+  16 | 
+  17 |     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+  18 | 
+  19 |     school_id: Mapped[int] = mapped_column(
+  20 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  21 |         nullable=False,
+  22 |         index=True,
+  23 |     )
+  24 | 
+  25 |     student_id: Mapped[int] = mapped_column(
+  26 |         ForeignKey("students.id", ondelete="CASCADE"),
+  27 |         nullable=False,
+  28 |         index=True,
+  29 |     )
+  30 | 
+  31 |     date: Mapped["Date"] = mapped_column(Date, nullable=False, index=True)
+  32 | 
+  33 |     # MVP: "present" | "absent"
+  34 |     status: Mapped[str] = mapped_column(String(16), nullable=False)
+  35 | 
+  36 |     marked_by_user_id: Mapped[int | None] = mapped_column(
+  37 |         ForeignKey("users.id", ondelete="SET NULL"),
+  38 |         nullable=True,
+  39 |         index=True,
+  40 |     )
+  41 | 
+  42 |     created_at: Mapped["DateTime"] = mapped_column(
+  43 |         DateTime(timezone=True),
+  44 |         nullable=False,
+  45 |         server_default=func.now(),
+  46 |     )
+
+/app/db/models/attendance_submission.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import Date, DateTime, ForeignKey, UniqueConstraint, func
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class AttendanceSubmission(Base):
+   8 |     __tablename__ = "attendance_submissions"
+   9 | 
+  10 |     __table_args__ = (
+  11 |         UniqueConstraint("school_id", "section_id", "date",
+  12 |                          name="uq_att_sub_school_section_date"),
+  13 |     )
+  14 | 
+  15 |     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+  16 | 
+  17 |     school_id: Mapped[int] = mapped_column(
+  18 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  19 |         nullable=False,
+  20 |         index=True,
+  21 |     )
+  22 | 
+  23 |     section_id: Mapped[int] = mapped_column(
+  24 |         ForeignKey("sections.id", ondelete="CASCADE"),
+  25 |         nullable=False,
+  26 |         index=True,
+  27 |     )
+  28 | 
+  29 |     date: Mapped["Date"] = mapped_column(Date, nullable=False, index=True)
+  30 | 
+  31 |     submitted_by_user_id: Mapped[int | None] = mapped_column(
+  32 |         ForeignKey("users.id", ondelete="SET NULL"),
+  33 |         nullable=True,
+  34 |         index=True,
+  35 |     )
+  36 | 
+  37 |     created_at: Mapped["DateTime"] = mapped_column(
+  38 |         DateTime(timezone=True),
+  39 |         nullable=False,
+  40 |         server_default=func.now(),
+  41 |     )
+
+/app/db/models/class_.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import ForeignKey, Integer, String
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class Class(Base):
+   8 |     __tablename__ = "classes"
+   9 | 
+  10 |     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+  11 | 
+  12 |     school_id: Mapped[int] = mapped_column(
+  13 |         Integer,
+  14 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  15 |         nullable=False,
+  16 |         index=True,
+  17 |     )
+  18 | 
+  19 |     name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+/app/db/models/marks_record.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class MarksRecord(Base):
+   8 |     __tablename__ = "marks_records"
+   9 | 
+  10 |     __table_args__ = (
+  11 |         UniqueConstraint(
+  12 |             "school_id",
+  13 |             "student_id",
+  14 |             "subject_id",
+  15 |             "exam_type",
+  16 |             name="uq_marks_school_student_subject_exam",
+  17 |         ),
+  18 |     )
+  19 | 
+  20 |     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+  21 | 
+  22 |     school_id: Mapped[int] = mapped_column(
+  23 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  24 |         nullable=False,
+  25 |         index=True,
+  26 |     )
+  27 | 
+  28 |     student_id: Mapped[int] = mapped_column(
+  29 |         ForeignKey("students.id", ondelete="CASCADE"),
+  30 |         nullable=False,
+  31 |         index=True,
+  32 |     )
+  33 | 
+  34 |     subject_id: Mapped[int] = mapped_column(
+  35 |         ForeignKey("subjects.id", ondelete="CASCADE"),
+  36 |         nullable=False,
+  37 |         index=True,
+  38 |     )
+  39 | 
+  40 |     exam_type: Mapped[str] = mapped_column(
+  41 |         String(32), nullable=False, index=True)
+  42 | 
+  43 |     marks_obtained: Mapped[int] = mapped_column(nullable=False)
+  44 |     max_marks: Mapped[int] = mapped_column(nullable=False)
+  45 | 
+  46 |     recorded_by_user_id: Mapped[int | None] = mapped_column(
+  47 |         ForeignKey("users.id", ondelete="SET NULL"),
+  48 |         nullable=True,
+  49 |         index=True,
+  50 |     )
+  51 | 
+  52 |     created_at: Mapped["DateTime"] = mapped_column(
+  53 |         DateTime(timezone=True),
+  54 |         nullable=False,
+  55 |         server_default=func.now(),
+  56 |     )
+
+/app/db/models/marks_submission.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class MarksSubmission(Base):
+   8 |     __tablename__ = "marks_submissions"
+   9 | 
+  10 |     __table_args__ = (
+  11 |         UniqueConstraint(
+  12 |             "school_id",
+  13 |             "section_id",
+  14 |             "subject_id",
+  15 |             "exam_type",
+  16 |             name="uq_marks_sub_school_section_subject_exam",
+  17 |         ),
+  18 |     )
+  19 | 
+  20 |     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+  21 | 
+  22 |     school_id: Mapped[int] = mapped_column(
+  23 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  24 |         nullable=False,
+  25 |         index=True,
+  26 |     )
+  27 | 
+  28 |     section_id: Mapped[int] = mapped_column(
+  29 |         ForeignKey("sections.id", ondelete="CASCADE"),
+  30 |         nullable=False,
+  31 |         index=True,
+  32 |     )
+  33 | 
+  34 |     subject_id: Mapped[int] = mapped_column(
+  35 |         ForeignKey("subjects.id", ondelete="CASCADE"),
+  36 |         nullable=False,
+  37 |         index=True,
+  38 |     )
+  39 | 
+  40 |     exam_type: Mapped[str] = mapped_column(
+  41 |         String(32), nullable=False, index=True)
+  42 | 
+  43 |     submitted_by_user_id: Mapped[int | None] = mapped_column(
+  44 |         ForeignKey("users.id", ondelete="SET NULL"),
+  45 |         nullable=True,
+  46 |         index=True,
+  47 |     )
+  48 | 
+  49 |     status: Mapped[str] = mapped_column(
+  50 |         String(32), nullable=False, default="submitted")
+  51 | 
+  52 |     created_at: Mapped["DateTime"] = mapped_column(
+  53 |         DateTime(timezone=True),
+  54 |         nullable=False,
+  55 |         server_default=func.now(),
+  56 |     )
+
+/app/db/models/notification_outbox.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import (
+   2 |     CheckConstraint,
+   3 |     DateTime,
+   4 |     ForeignKey,
+   5 |     Index,
+   6 |     Integer,
+   7 |     String,
+   8 |     Text,
+   9 |     func,
+  10 | )
+  11 | from sqlalchemy.orm import Mapped, mapped_column
+  12 | 
+  13 | from app.db.base import Base
+  14 | 
+  15 | 
+  16 | class NotificationOutbox(Base):
+  17 |     __tablename__ = "notification_outbox"
+  18 | 
+  19 |     __table_args__ = (
+  20 |         # Exactly one submission reference must be set (attendance OR marks)
+  21 |         CheckConstraint(
+  22 |             "(attendance_submission_id IS NOT NULL AND marks_submission_id IS NULL) OR "
+  23 |             "(attendance_submission_id IS NULL AND marks_submission_id IS NOT NULL)",
+  24 |             name="ck_outbox_exactly_one_submission_fk",
+  25 |         ),
+  26 |         # Dedupe for attendance submissions
+  27 |         Index(
+  28 |             "uq_outbox_attendance_dedupe",
+  29 |             "event_type",
+  30 |             "attendance_submission_id",
+  31 |             "recipient_phone",
+  32 |             unique=True,
+  33 |             postgresql_where="attendance_submission_id IS NOT NULL",
+  34 |         ),
+  35 |         # Dedupe for marks submissions
+  36 |         Index(
+  37 |             "uq_outbox_marks_dedupe",
+  38 |             "event_type",
+  39 |             "marks_submission_id",
+  40 |             "recipient_phone",
+  41 |             unique=True,
+  42 |             postgresql_where="marks_submission_id IS NOT NULL",
+  43 |         ),
+  44 |     )
+  45 | 
+  46 |     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+  47 | 
+  48 |     school_id: Mapped[int] = mapped_column(
+  49 |         Integer,
+  50 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  51 |         nullable=False,
+  52 |         index=True,
+  53 |     )
+  54 | 
+  55 |     event_type: Mapped[str] = mapped_column(
+  56 |         String(64), nullable=False, index=True)
+  57 |     # event_type examples: ATTENDANCE_SUBMITTED, MARKS_SUBMITTED
+  58 | 
+  59 |     attendance_submission_id: Mapped[int | None] = mapped_column(
+  60 |         Integer,
+  61 |         ForeignKey("attendance_submissions.id", ondelete="CASCADE"),
+  62 |         nullable=True,
+  63 |         index=True,
+  64 |     )
+  65 | 
+  66 |     marks_submission_id: Mapped[int | None] = mapped_column(
+  67 |         Integer,
+  68 |         ForeignKey("marks_submissions.id", ondelete="CASCADE"),
+  69 |         nullable=True,
+  70 |         index=True,
+  71 |     )
+  72 | 
+  73 |     recipient_phone: Mapped[str] = mapped_column(
+  74 |         String(32), nullable=False, index=True)
+  75 | 
+  76 |     # Minimal payload storage for Phase 1 (stringified JSON or text)
+  77 |     payload: Mapped[str] = mapped_column(Text, nullable=False)
+  78 | 
+  79 |     status: Mapped[str] = mapped_column(
+  80 |         String(16), nullable=False, default="PENDING", index=True)
+  81 |     # PENDING | SENT | FAILED
+  82 | 
+  83 |     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+  84 |     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+  85 | 
+  86 |     created_at: Mapped["DateTime"] = mapped_column(
+  87 |         DateTime(timezone=True),
+  88 |         nullable=False,
+  89 |         server_default=func.now(),
+  90 |     )
+  91 |     next_attempt_at: Mapped["DateTime"] = mapped_column(
+  92 |         DateTime(timezone=True),
+  93 |         nullable=False,
+  94 |         server_default=func.now(),
+  95 |         index=True,
+  96 |     )
+  97 |     sent_at: Mapped["DateTime | None"] = mapped_column(
+  98 |         DateTime(timezone=True), nullable=True)
+
+/app/db/models/otp_request.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import DateTime, String, func
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class OtpRequest(Base):
+   8 |     __tablename__ = "otp_requests"
+   9 | 
+  10 |     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+  11 | 
+  12 |     phone: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+  13 | 
+  14 |     # Store hash only, never store the raw OTP
+  15 |     otp_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+  16 | 
+  17 |     expires_at: Mapped["DateTime"] = mapped_column(DateTime(timezone=True), nullable=False)
+  18 | 
+  19 |     attempt_count: Mapped[int] = mapped_column(nullable=False, default=0)
+  20 | 
+  21 |     consumed_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+  22 | 
+  23 |     created_at: Mapped["DateTime"] = mapped_column(
+  24 |         DateTime(timezone=True),
+  25 |         nullable=False,
+  26 |         server_default=func.now(),
+  27 |     )
+
+/app/db/models/principal.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class Principal(Base):
+   8 |     __tablename__ = "principals"
+   9 | 
+  10 |     __table_args__ = (
+  11 |         UniqueConstraint("school_id", name="uq_principals_school_id"),
+  12 |         UniqueConstraint("user_id", name="uq_principals_user_id"),
+  13 |     )
+  14 | 
+  15 |     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+  16 | 
+  17 |     school_id: Mapped[int] = mapped_column(
+  18 |         Integer,
+  19 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  20 |         nullable=False,
+  21 |         index=True,
+  22 |     )
+  23 | 
+  24 |     user_id: Mapped[int] = mapped_column(
+  25 |         Integer,
+  26 |         ForeignKey("users.id", ondelete="RESTRICT"),
+  27 |         nullable=False,
+  28 |         index=True,
+  29 |     )
+  30 | 
+  31 |     name: Mapped[str] = mapped_column(String(200), nullable=False)
+  32 | 
+  33 |     created_at: Mapped["DateTime"] = mapped_column(
+  34 |         DateTime(timezone=True),
+  35 |         nullable=False,
+  36 |         server_default=func.now(),
+  37 |     )
+
+/app/db/models/school.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import String
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class School(Base):
+   8 |     """
+   9 |     Represents a school tenant in VidyaTrack.
+  10 | 
+  11 |     This is the top-level entity required for multi-tenant separation.
+  12 |     """
+  13 |     __tablename__ = "schools"
+  14 | 
+  15 |     id: Mapped[int] = mapped_column(primary_key=True)
+  16 |     name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+/app/db/models/section.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import ForeignKey, Integer, String
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class Section(Base):
+   8 |     __tablename__ = "sections"
+   9 | 
+  10 |     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+  11 | 
+  12 |     school_id: Mapped[int] = mapped_column(
+  13 |         Integer,
+  14 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  15 |         nullable=False,
+  16 |         index=True,
+  17 |     )
+  18 | 
+  19 |     class_id: Mapped[int] = mapped_column(
+  20 |         Integer,
+  21 |         ForeignKey("classes.id", ondelete="CASCADE"),
+  22 |         nullable=False,
+  23 |         index=True,
+  24 |     )
+  25 | 
+  26 |     name: Mapped[str] = mapped_column(String(50), nullable=False)
+
+/app/db/models/section_subject_teacher.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import DateTime, ForeignKey, Index, UniqueConstraint, func
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class SectionSubjectTeacher(Base):
+   8 |     __tablename__ = "section_subject_teachers"
+   9 | 
+  10 |     __table_args__ = (
+  11 |         UniqueConstraint(
+  12 |             "school_id",
+  13 |             "section_id",
+  14 |             "subject_id",
+  15 |             name="uq_sst_school_section_subject",
+  16 |         ),
+  17 |         Index("ix_sst_school_section", "school_id", "section_id"),
+  18 |         Index("ix_sst_school_teacher", "school_id", "teacher_id"),
+  19 |     )
+  20 | 
+  21 |     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+  22 | 
+  23 |     school_id: Mapped[int] = mapped_column(
+  24 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  25 |         nullable=False,
+  26 |         index=True,
+  27 |     )
+  28 | 
+  29 |     section_id: Mapped[int] = mapped_column(
+  30 |         ForeignKey("sections.id", ondelete="CASCADE"),
+  31 |         nullable=False,
+  32 |         index=True,
+  33 |     )
+  34 | 
+  35 |     subject_id: Mapped[int] = mapped_column(
+  36 |         ForeignKey("subjects.id", ondelete="CASCADE"),
+  37 |         nullable=False,
+  38 |         index=True,
+  39 |     )
+  40 | 
+  41 |     teacher_id: Mapped[int] = mapped_column(
+  42 |         ForeignKey("teachers.id", ondelete="CASCADE"),
+  43 |         nullable=False,
+  44 |         index=True,
+  45 |     )
+  46 | 
+  47 |     created_at: Mapped["DateTime"] = mapped_column(
+  48 |         DateTime(timezone=True),
+  49 |         nullable=False,
+  50 |         server_default=func.now(),
+  51 |     )
+
+/app/db/models/student.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import ForeignKey, Integer, String
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class Student(Base):
+   8 |     __tablename__ = "students"
+   9 | 
+  10 |     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+  11 | 
+  12 |     school_id: Mapped[int] = mapped_column(
+  13 |         Integer,
+  14 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  15 |         nullable=False,
+  16 |         index=True,
+  17 |     )
+  18 |     section_id: Mapped[int | None] = mapped_column(
+  19 |         Integer,
+  20 |         ForeignKey("sections.id", ondelete="SET NULL"),
+  21 |         nullable=True,
+  22 |         index=True,
+  23 |     )
+  24 |     name: Mapped[str] = mapped_column(String(255), nullable=False)
+  25 | 
+  26 |     parent_phone: Mapped[str] = mapped_column(String(32), nullable=False)
+  27 |     parent_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+/app/db/models/student_note.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import DateTime, ForeignKey, Index, Text, func
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class StudentNote(Base):
+   8 |     __tablename__ = "student_notes"
+   9 | 
+  10 |     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+  11 | 
+  12 |     school_id: Mapped[int] = mapped_column(
+  13 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  14 |         nullable=False,
+  15 |         index=True,
+  16 |     )
+  17 | 
+  18 |     student_id: Mapped[int] = mapped_column(
+  19 |         ForeignKey("students.id", ondelete="CASCADE"),
+  20 |         nullable=False,
+  21 |         index=True,
+  22 |     )
+  23 | 
+  24 |     author_user_id: Mapped[int | None] = mapped_column(
+  25 |         ForeignKey("users.id", ondelete="SET NULL"),
+  26 |         nullable=True,
+  27 |         index=True,
+  28 |     )
+  29 | 
+  30 |     note_text: Mapped[str] = mapped_column(Text, nullable=False)
+  31 | 
+  32 |     created_at: Mapped["DateTime"] = mapped_column(
+  33 |         DateTime(timezone=True),
+  34 |         nullable=False,
+  35 |         server_default=func.now(),
+  36 |     )
+  37 | 
+  38 | 
+  39 | Index("ix_student_notes_school_student",
+  40 |       StudentNote.school_id, StudentNote.student_id)
+
+/app/db/models/subject.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import ForeignKey, Integer, String
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class Subject(Base):
+   8 |     __tablename__ = "subjects"
+   9 | 
+  10 |     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+  11 | 
+  12 |     school_id: Mapped[int] = mapped_column(
+  13 |         Integer,
+  14 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  15 |         nullable=False,
+  16 |         index=True,
+  17 |     )
+  18 | 
+  19 |     name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+/app/db/models/teacher.py:
+--------------------------------------------------------------------------------
+   1 | # app/db/models/teacher.py
+   2 | from sqlalchemy import ForeignKey, Integer, String
+   3 | from sqlalchemy.orm import Mapped, mapped_column
+   4 | 
+   5 | from app.db.base import Base
+   6 | 
+   7 | 
+   8 | class Teacher(Base):
+   9 |     __tablename__ = "teachers"
+  10 | 
+  11 |     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+  12 |     school_id: Mapped[int] = mapped_column(
+  13 |         Integer,
+  14 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  15 |         nullable=False,
+  16 |         index=True,
+  17 |     )
+  18 |     user_id: Mapped[int] = mapped_column(
+  19 |         ForeignKey("users.id", ondelete="CASCADE"),
+  20 |         nullable=False,
+  21 |         index=True,
+  22 |         unique=True,  # pilot: one user maps to one teacher
+  23 |     )
+  24 |     name: Mapped[str] = mapped_column(String(200), nullable=False)
+  25 |     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+/app/db/models/teacher_primary_section.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import ForeignKey, UniqueConstraint, Index
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class TeacherPrimarySection(Base):
+   8 |     __tablename__ = "teacher_primary_sections"
+   9 | 
+  10 |     __table_args__ = (
+  11 |         UniqueConstraint("school_id", "teacher_id",
+  12 |                          name="uq_tps_school_teacher"),
+  13 |         Index("ix_tps_school_teacher", "school_id", "teacher_id"),
+  14 |     )
+  15 | 
+  16 |     id: Mapped[int] = mapped_column(primary_key=True)
+  17 | 
+  18 |     school_id: Mapped[int] = mapped_column(
+  19 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  20 |         nullable=False,
+  21 |         index=True,
+  22 |     )
+  23 | 
+  24 |     teacher_id: Mapped[int] = mapped_column(
+  25 |         ForeignKey("teachers.id", ondelete="CASCADE"),
+  26 |         nullable=False,
+  27 |         index=True,
+  28 |     )
+  29 | 
+  30 |     section_id: Mapped[int] = mapped_column(
+  31 |         ForeignKey("sections.id", ondelete="CASCADE"),
+  32 |         nullable=False,
+  33 |         index=True,
+  34 |     )
+
+/app/db/models/user.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import Boolean, ForeignKey, String
+   2 | from sqlalchemy.orm import Mapped, mapped_column
+   3 | 
+   4 | from app.db.base import Base
+   5 | 
+   6 | 
+   7 | class User(Base):
+   8 |     __tablename__ = "users"
+   9 | 
+  10 |     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+  11 | 
+  12 |     school_id: Mapped[int] = mapped_column(
+  13 |         ForeignKey("schools.id", ondelete="CASCADE"),
+  14 |         nullable=False,
+  15 |         index=True,
+  16 |     )
+  17 | 
+  18 |     phone: Mapped[str] = mapped_column(
+  19 |         String(20), nullable=False, unique=True, index=True)
+  20 | 
+  21 |     email: Mapped[str | None] = mapped_column(
+  22 |         String(255), nullable=True, index=True)
+  23 |     # MVP roles: MANAGEMENT | PRINCIPAL | TEACHER
+  24 |     role: Mapped[str] = mapped_column(String(32), nullable=False)
+  25 | 
+  26 |     is_active: Mapped[bool] = mapped_column(
+  27 |         Boolean, nullable=False, default=True)
+
+/app/db/session.py:
+--------------------------------------------------------------------------------
+   1 | from sqlalchemy import create_engine
+   2 | from sqlalchemy.orm import sessionmaker
+   3 | 
+   4 | from app.core.config import settings
+   5 | 
+   6 | 
+   7 | def _build_database_url() -> str:
+   8 |     """
+   9 |     Build PostgreSQL DB URL from environment-backed settings.
+  10 |     """
+  11 |     return (
+  12 |         f"postgresql+psycopg://{settings.db_user}:"
+  13 |         f"{settings.db_password}@{settings.db_host}:"
+  14 |         f"{settings.db_port}/{settings.db_name}"
+  15 |     )
+  16 | 
+  17 | 
+  18 | engine = create_engine(
+  19 |     _build_database_url(),
+  20 |     pool_pre_ping=True,
+  21 | )
+  22 | 
+  23 | SessionLocal = sessionmaker(
+  24 |     autocommit=False,
+  25 |     autoflush=False,
+  26 |     bind=engine,
+  27 | )
+
+/app/main.py:
+--------------------------------------------------------------------------------
+   1 | from fastapi import FastAPI
+   2 | 
+   3 | from app.api.v1.router import api_router
+   4 | from app.core.config import settings
+   5 | from app.core.logging import setup_logging
+   6 | import time
+   7 | import logging
+   8 | from starlette.requests import Request
+   9 | from fastapi.middleware.cors import CORSMiddleware
+  10 | 
+  11 | logger = logging.getLogger(__name__)
+  12 | 
+  13 | setup_logging()
+  14 | 
+  15 | app = FastAPI(
+  16 |     title=settings.app_name,
+  17 |     version="0.1.0",
+  18 | )
+  19 | 
+  20 | 
+  21 | app.add_middleware(
+  22 |     CORSMiddleware,
+  23 |     allow_origins=[
+  24 |         "http://localhost:5173",        # Vite dev
+  25 |         "http://127.0.0.1:5173",        # Vite dev (alt)
+  26 |     ],
+  27 |     allow_credentials=True,
+  28 |     allow_methods=["*"],
+  29 |     allow_headers=["*"],
+  30 | )
+  31 | 
+  32 | 
+  33 | @app.middleware("http")
+  34 | async def request_logging_middleware(request: Request, call_next):
+  35 |     start = time.perf_counter()
+  36 |     response = await call_next(request)
+  37 |     duration_ms = (time.perf_counter() - start) * 1000
+  38 | 
+  39 |     logger.info(
+  40 |         "request completed",
+  41 |         extra={
+  42 |             "method": request.method,
+  43 |             "path": request.url.path,
+  44 |             "status_code": response.status_code,
+  45 |             "duration_ms": round(duration_ms, 2),
+  46 |         },
+  47 |     )
+  48 |     return response
+  49 | 
+  50 | app.include_router(api_router, prefix="/api/v1")
+
+/app/workers/outbox_worker.py:
+--------------------------------------------------------------------------------
+   1 | 
+   2 | from __future__ import annotations
+   3 | 
+   4 | from datetime import datetime, timezone, timedelta
+   5 | from typing import Optional
+   6 | 
+   7 | from sqlalchemy.orm import Session
+   8 | 
+   9 | from app.db.models.notification_outbox import NotificationOutbox
+  10 | 
+  11 | 
+  12 | def process_outbox_batch(
+  13 |     db: Session,
+  14 |     *,
+  15 |     limit: int = 50,
+  16 | ) -> int:
+  17 |     """
+  18 |     Phase 2 worker (synchronous, local-run only):
+  19 |     - Fetch PENDING outbox rows
+  20 |     - 'Send' by printing to console (no external integration)
+  21 |     - Mark row SENT with sent_at
+  22 |     - Retry-safe: if a row is already SENT, it will not be reprocessed
+  23 |     """
+  24 |     now = datetime.now(timezone.utc)
+  25 |     rows = (
+  26 |         db.query(NotificationOutbox)
+  27 |         .filter(
+  28 |             NotificationOutbox.status.in_(["PENDING", "FAILED"]),
+  29 |             NotificationOutbox.next_attempt_at <= now,
+  30 |         )
+  31 |         .order_by(NotificationOutbox.id.asc())
+  32 |         .limit(limit)
+  33 |         .all())
+  34 | 
+  35 |     processed = 0
+  36 |     MAX_ATTEMPTS = 5
+  37 |     BACKOFF_MINUTES = [1, 5, 15, 60, 240]  # simple exponential-ish backoff
+  38 | 
+  39 |     for row in rows:
+  40 |         try:
+  41 |             # Simulated send (still stubbed)
+  42 |             print(
+  43 |                 f"[OUTBOX][SEND] id={row.id} event={row.event_type} "
+  44 |                 f"to={row.recipient_phone} payload={row.payload}"
+  45 |             )
+  46 | 
+  47 |             # raise Exception("test failure")
+  48 | 
+  49 |             # Success path
+  50 |             row.status = "SENT"
+  51 |             row.sent_at = now
+  52 |             row.last_error = None
+  53 | 
+  54 |             processed += 1
+  55 | 
+  56 |         except Exception as exc:
+  57 |             # Failure path
+  58 |             row.attempts += 1
+  59 |             row.status = "FAILED"
+  60 |             row.last_error = str(exc)
+  61 | 
+  62 |             if row.attempts >= MAX_ATTEMPTS:
+  63 |                 # Stop retrying
+  64 |                 row.next_attempt_at = now + timedelta(days=365)
+  65 |             else:
+  66 |                 delay = BACKOFF_MINUTES[min(
+  67 |                     row.attempts - 1, len(BACKOFF_MINUTES) - 1)]
+  68 |                 row.next_attempt_at = now + timedelta(minutes=delay)
+  69 | 
+  70 |     if processed:
+  71 |         db.commit()
+  72 | 
+  73 |     return processed
+
+/requirements.txt:
+--------------------------------------------------------------------------------
+   1 | fastapi==0.115.0
+   2 | uvicorn[standard]==0.30.6
+   3 | pydantic-settings==2.4.0
+   4 | SQLAlchemy==2.0.34
+   5 | alembic==1.13.2
+   6 | psycopg[binary]==3.2.1
+

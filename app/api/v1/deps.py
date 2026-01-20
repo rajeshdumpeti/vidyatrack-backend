@@ -108,3 +108,12 @@ def require_teacher_or_management_or_principal(
             detail="insufficient_permissions",
         )
     return current_user
+
+
+def require_principal(current_user: dict = Depends(get_current_user)) -> dict:
+    if current_user.get("role") != "PRINCIPAL":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+    return current_user

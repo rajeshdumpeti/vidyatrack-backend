@@ -11,6 +11,10 @@ from app.db.models.section import Section
 from app.db.models.class_ import Class
 from app.db.models.subject import Subject
 from app.db.models.user import User  # keep consistent with your project
+from app.api.v1.routes.teacher_me import (
+    TeacherAttendanceSectionOut,
+    get_attendance_section,
+)
 
 router = APIRouter(prefix="/teachers/me", tags=["teachers-me"])
 
@@ -116,3 +120,11 @@ def get_my_teaching_assignments(
         )
         for r in rows
     ]
+
+
+@router.get("/attendance-section", response_model=TeacherAttendanceSectionOut)
+def get_my_attendance_section(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(require_teacher),
+):
+    return get_attendance_section(db=db, current_user=current_user)
