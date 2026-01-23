@@ -24,13 +24,27 @@ class Settings(BaseSettings):
     otp_pepper: str = Field(default="change_me", alias="OTP_PEPPER")
     otp_ttl_minutes: int = Field(default=5, alias="OTP_TTL_MINUTES")
 
+    # WhatsApp Cloud API (pilot-safe)
+    whatsapp_enabled: bool = Field(default=False, alias="WHATSAPP_ENABLED")
+    whatsapp_access_token: str = Field(
+        default="", alias="WHATSAPP_ACCESS_TOKEN")
+    whatsapp_phone_number_id: str = Field(
+        default="", alias="WHATSAPP_PHONE_NUMBER_ID")
+    whatsapp_waba_id: str = Field(default="", alias="WHATSAPP_WABA_ID")
+    whatsapp_api_version: str = Field(
+        default="v20.0", alias="WHATSAPP_API_VERSION")
+    whatsapp_base_url: str = Field(
+        default="https://graph.facebook.com", alias="WHATSAPP_BASE_URL")
+    whatsapp_timeout_seconds: int = Field(
+        default=10, alias="WHATSAPP_TIMEOUT_SECONDS")
 
-    # Pydantic v2 settings configuration
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        populate_by_name=True,  # allows access via field names while supporting aliases
-    )
+
+# Pydantic v2 settings configuration
+model_config = SettingsConfigDict(
+    env_file=".env",
+    env_file_encoding="utf-8",
+    populate_by_name=True,  # allows access via field names while supporting aliases
+)
 
 
 settings = Settings()

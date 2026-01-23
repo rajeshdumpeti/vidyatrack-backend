@@ -7,6 +7,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.db.models.notification_outbox import NotificationOutbox
+from app.core.config import settings
+from app.integrations.whatsapp.client import send_text, WhatsAppSendError
 
 
 def process_outbox_batch(
@@ -21,6 +23,7 @@ def process_outbox_batch(
     - Mark row SENT with sent_at
     - Retry-safe: if a row is already SENT, it will not be reprocessed
     """
+
     now = datetime.now(timezone.utc)
     rows = (
         db.query(NotificationOutbox)
@@ -35,6 +38,12 @@ def process_outbox_batch(
     processed = 0
     MAX_ATTEMPTS = 5
     BACKOFF_MINUTES = [1, 5, 15, 60, 240]  # simple exponential-ish backoff
+
+    def _mask_phone(p: str | None) -> str:
+        if not p:
+            return ""
+        p = str(p)
+        return ("*" * max(len(p) - 4, 0)) + p[-4:]
 
     for row in rows:
         try:

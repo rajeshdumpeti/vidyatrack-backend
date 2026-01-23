@@ -1,6 +1,7 @@
 import json
 
-from datetime import date as date_type
+from datetime import date as date_type, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict
@@ -22,6 +23,11 @@ class AttendanceCreate(BaseModel):
 
     student_id: int
     date: date_type
+    status: str  # "present" | "absent"
+
+
+class AttendanceUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     status: str  # "present" | "absent"
 
 
@@ -130,6 +136,51 @@ def list_attendance(
         .order_by(AttendanceRecord.id.asc())
         .all()
     )
+
+
+@router.put("/{attendance_id}", response_model=AttendanceOut)
+def update_attendance(
+    attendance_id: int,
+    payload: AttendanceUpdate,
+    db: Session = Depends(get_db),
+    # or Depends(require_teacher) if you have it
+    current_user: dict = Depends(get_current_user),
+):
+    # Role gate: TEACHER only
+    if current_user.get("role") != "TEACHER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+
+    # Fetch attendance row scoped to tenant
+    row = (
+        db.query(AttendanceRecord)
+        .filter(
+            AttendanceRecord.id == attendance_id,
+            AttendanceRecord.school_id == current_user["school_id"],
+        )
+        .first()
+    )
+    if not row:
+        # Cross-tenant and missing both become 400 per your rule
+        raise HTTPException(status_code=400, detail="invalid_attendance_id")
+
+    # Same-day edit rule (India calendar date)
+    today_ist = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    if row.date != today_ist:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="attendance_edit_window_closed",
+        )
+
+    # Overwrite (no duplicates)
+    row.status = payload.status
+    row.marked_by_user_id = current_user["user_id"]
+
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 @router.post("/submit", response_model=AttendanceSubmissionOut, status_code=201)
