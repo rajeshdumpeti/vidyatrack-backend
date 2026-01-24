@@ -1,6 +1,7 @@
 import json
 
-from datetime import date as date_type
+from datetime import date as date_type, datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict
@@ -13,6 +14,8 @@ from app.db.models.student import Student
 from app.db.models.attendance_submission import AttendanceSubmission
 from app.db.models.section import Section
 from app.db.models.notification_outbox import NotificationOutbox
+from app.db.models.teacher import Teacher
+from app.db.models.teacher_primary_section import TeacherPrimarySection
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 
@@ -53,6 +56,11 @@ class AttendanceSubmissionOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AttendanceUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: str  # "PRESENT" | "ABSENT"
 
 
 @router.post("", response_model=AttendanceOut, status_code=201)
@@ -220,5 +228,108 @@ def submit_attendance(
 
         raise HTTPException(status_code=409, detail="already_submitted")
 
+    db.refresh(row)
+    return row
+
+
+@router.put("/{attendance_id}", response_model=AttendanceOut)
+def update_attendance(
+    attendance_id: int,
+    payload: AttendanceUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    # TEACHER-only
+    if current_user.get("role") != "TEACHER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+
+    school_id = current_user["school_id"]
+    user_id = current_user["user_id"]
+
+    # Fetch attendance record tenant-scoped (no leakage)
+    row = (
+        db.query(AttendanceRecord)
+        .filter(
+            AttendanceRecord.id == attendance_id,
+            AttendanceRecord.school_id == school_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="attendance_not_found")
+
+    # Same-day edit (India calendar date)
+    today_ist = datetime.now(ZoneInfo("Asia/Kolkata")).date()
+    if row.date != today_ist:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="attendance_edit_not_allowed",
+        )
+
+    # Resolve teacher via teachers.user_id + tenant scope
+    teacher = (
+        db.query(Teacher)
+        .filter(
+            Teacher.school_id == school_id,
+            Teacher.user_id == user_id,
+        )
+        .first()
+    )
+    if not teacher:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="teacher_not_found")
+
+    # Resolve teacher primary section
+    mapping = (
+        db.query(TeacherPrimarySection)
+        .filter(
+            TeacherPrimarySection.school_id == school_id,
+            TeacherPrimarySection.teacher_id == teacher.id,
+        )
+        .first()
+    )
+    if not mapping:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="no_primary_section_assigned")
+
+    # Student must be in teacher's primary section
+    student = (
+        db.query(Student)
+        .filter(
+            Student.id == row.student_id,
+            Student.school_id == school_id,
+        )
+        .first()
+    )
+    if not student:
+        # should not happen if FK integrity is good; still avoid leaking
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="attendance_not_found")
+
+    if getattr(student, "section_id", None) != mapping.section_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="out_of_scope",
+        )
+
+    # Validate + normalize status (request is PRESENT/ABSENT)
+    s = payload.status.strip().upper()
+    if s not in ("PRESENT", "ABSENT"):
+        # keep it simple; 422 could be better but this is deterministic and explicit
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="invalid_status")
+
+    # Update only status; do not change student_id/date/school_id
+    # For consistency with existing data ("present"/"absent"), normalize to lowercase
+    row.status = "present" if s == "PRESENT" else "absent"
+
+    # Audit-safe: mark who edited (recommended)
+    row.marked_by_user_id = user_id
+
+    db.commit()
     db.refresh(row)
     return row
