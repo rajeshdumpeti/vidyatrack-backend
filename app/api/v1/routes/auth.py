@@ -148,6 +148,7 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
         "sub": str(user.id),
         "school_id": user.school_id,
         "role": user.role,
+        "is_super_admin": user.role == "SUPER_ADMIN",
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
     }
