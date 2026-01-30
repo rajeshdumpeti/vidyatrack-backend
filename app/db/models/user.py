@@ -9,12 +9,12 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
-    school_id: Mapped[int | None] = mapped_column(
-        ForeignKey("schools.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-        default=None
-    )
+    # school_id: Mapped[int | None] = mapped_column(
+    #     ForeignKey("schools.id", ondelete="CASCADE"),
+    #     nullable=True,
+    #     index=True,
+    #     default=None
+    # )
 
     phone: Mapped[str] = mapped_column(
         String(20), nullable=False, unique=True, index=True)
