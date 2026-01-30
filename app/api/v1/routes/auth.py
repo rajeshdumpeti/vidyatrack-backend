@@ -10,11 +10,12 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_db
+from app.api.v1.deps import get_current_user, get_db
 from app.core.phone import normalize_phone, phone_candidates
 from app.db.models.otp_request import OtpRequest
 from app.db.models.user import User
 from app.core.config import settings
+from app.db.models.user_school import UserSchool
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -146,11 +147,38 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
 
     token_payload = {
         "sub": str(user.id),
-        "school_id": user.school_id,
+        # We remove the single school_id here.
+        # The frontend will now call a separate /me or /user/schools
+        # endpoint to see which schools this user can access.
         "role": user.role,
+        "is_super_admin": user.role == "super_admin",
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
     }
 
     token = _jwt_encode_hs256(token_payload)
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/me")
+def get_me(
+    db: Session = Depends(get_db),
+    # This helper must return the User object
+    current_user: User = Depends(get_current_user),
+):
+    # Fetch all schools linked to this user
+    user_schools = db.query(UserSchool).filter(
+        UserSchool.user_id == current_user.id).all()
+
+    return {
+        "id": current_user.id,
+        "phone": current_user.phone,
+        "role": current_user.role,
+        "schools": [
+            {
+                "id": us.school_id,
+                "name": us.school.name,
+                "role": us.role
+            } for us in user_schools
+        ]
+    }

@@ -1,53 +1,45 @@
 from __future__ import annotations
 import re
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.deps import get_db, require_management
 from app.core.phone import normalize_phone, phone_candidates
 from app.db.models.teacher import Teacher
 from app.db.models.teacher_primary_section import TeacherPrimarySection
 from app.db.models.section import Section
-# keep this import path consistent with your project
 from app.db.models.user import User
 
-router = APIRouter(prefix="/management/teachers", tags=["management-teachers"])
-
-
+router_mgmt = APIRouter(prefix="/management/teachers",
+                        tags=["management-teachers"])
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# --- SCHEMAS ---
 
 
 class ManagementCreateTeacherIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     name: str = Field(min_length=1, max_length=200)
     email: str | None = Field(default=None, min_length=5, max_length=255)
     phone: str | None = Field(default=None, min_length=10, max_length=20)
     section_id: int
-    # keep if you want, but must NOT be sent; or remove field entirely
-    role: str | None = None
+    school_id: int  # Mandatory from payload since User model doesn't store it
 
     @model_validator(mode="after")
     def validate_contact(self) -> "ManagementCreateTeacherIn":
-        # require at least one of email/phone
-        if (self.email is None or self.email.strip() == "") and (
-            self.phone is None or self.phone.strip() == ""
-        ):
+        if not self.email and not self.phone:
             raise ValueError("email_or_phone_required")
-
-        # optional basic email validation
-        if self.email is not None:
-            e = self.email.strip()
-            if not EMAIL_RE.match(e):
+        if self.email:
+            self.email = self.email.strip()
+            if not EMAIL_RE.match(self.email):
                 raise ValueError("invalid_email_format")
-            self.email = e
-
-        # optional phone normalization (trim only)
-        if self.phone is not None:
+        if self.phone:
             self.phone = normalize_phone(self.phone)
-
         return self
 
 
@@ -58,142 +50,113 @@ class ManagementCreateTeacherOut(BaseModel):
     email: str | None = None
     phone: str | None = None
     section_id: int
+    model_config = ConfigDict(from_attributes=True)
 
-    class Config:
-        from_attributes = True
+# --- ROUTES ---
 
 
-@router.post("", response_model=ManagementCreateTeacherOut, status_code=201)
+@router_mgmt.post("", response_model=ManagementCreateTeacherOut, status_code=201)
 def management_create_teacher(
     payload: ManagementCreateTeacherIn,
     response: Response,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_management),
+    current_user: User = Depends(require_management),
 ):
-    school_id = current_user["school_id"]
+    # Trust the school_id from payload since User is multi-school
+    sid = payload.school_id
 
+    # 1. Validate Section
     section = (
         db.query(Section)
-        .filter(Section.school_id == school_id, Section.id == payload.section_id)
+        .filter(Section.school_id == sid, Section.id == payload.section_id)
         .first()
     )
     if not section:
         raise HTTPException(status_code=400, detail="invalid_section_id")
 
-    # Idempotency lookup: same school + same email OR same phone
-    q = db.query(User).filter(User.school_id == school_id)
+    # 2. Idempotency Check: Find existing user by phone
+    # Note: Using global phone lookup as phone is unique in your User model
+    existing_user = (
+        db.query(User)
+        .filter(User.phone.in_(phone_candidates(payload.phone)))
+        .first()
+    )
 
-    candidates = []
-    if payload.phone:
-        candidates.append(User.phone.in_(phone_candidates(payload.phone)))
-
-    existing_user = None
-    if candidates:
-        existing_user = q.filter((candidates[0]) if len(
-            candidates) == 1 else (candidates[0] | candidates[1])).first()
-        if payload.email:
-            candidates.append(User.email == payload.email)
-
+    teacher = None
     if existing_user:
-        # Ensure teacher row exists for this user (pilot: 1 user -> 1 teacher)
-        existing_teacher = (
+        # Check if they are already a teacher in THIS school
+        teacher = (
             db.query(Teacher)
-            .filter(
-                Teacher.school_id == school_id,
-                Teacher.user_id == existing_user.id,
-            )
+            .filter(Teacher.school_id == sid, Teacher.user_id == existing_user.id)
             .first()
         )
-        if existing_teacher:
-            mapping = (
-                db.query(TeacherPrimarySection)
-                .filter(
-                    TeacherPrimarySection.school_id == school_id,
-                    TeacherPrimarySection.teacher_id == existing_teacher.id,
-                )
-                .first()
-            )
+
+        if teacher:
+            # Update primary section if they already exist
+            mapping = db.query(TeacherPrimarySection).filter(
+                TeacherPrimarySection.teacher_id == teacher.id,
+                TeacherPrimarySection.school_id == sid
+            ).first()
+
             if mapping:
                 mapping.section_id = payload.section_id
             else:
-                mapping = TeacherPrimarySection(
-                    school_id=school_id,
-                    teacher_id=existing_teacher.id,
-                    section_id=payload.section_id,
-                )
-                db.add(mapping)
+                db.add(TeacherPrimarySection(school_id=sid,
+                       teacher_id=teacher.id, section_id=payload.section_id))
+
             db.commit()
             response.status_code = status.HTTP_200_OK
             return ManagementCreateTeacherOut(
                 user_id=existing_user.id,
-                teacher_id=existing_teacher.id,
-                name=existing_teacher.name,
-                email=existing_teacher.email,
-                phone=payload.phone,  # phone not stored on Teacher model currently
-                section_id=payload.section_id,
+                teacher_id=teacher.id,
+                name=teacher.name,
+                email=existing_user.email,
+                phone=existing_user.phone,
+                section_id=payload.section_id
             )
 
-        # User exists but teacher missing -> create teacher row (201)
+    # 3. Create New User if needed
+    if not existing_user:
+        new_user = User(
+            role="TEACHER",
+            phone=payload.phone,
+            email=payload.email,
+            is_active=True
+        )
+        db.add(new_user)
+        db.flush()
+        existing_user = new_user
+
+    # 4. Create Teacher record
+    if not teacher:
         teacher = Teacher(
-            school_id=school_id,
+            school_id=sid,
             user_id=existing_user.id,
             name=payload.name,
         )
         db.add(teacher)
         db.flush()
 
-        mapping = TeacherPrimarySection(
-            school_id=school_id,
-            teacher_id=teacher.id,
-            section_id=payload.section_id,
-        )
-        db.add(mapping)
-        db.commit()
-        db.refresh(teacher)
-
-        return ManagementCreateTeacherOut(
-            user_id=existing_user.id,
-            teacher_id=teacher.id,
-            name=teacher.name,
-            email=teacher.email,
-            phone=payload.phone,
-            section_id=payload.section_id,
-        )
-
-    # Create BOTH: User + Teacher (role forced server-side)
-    user = User(
-        school_id=school_id,
-        role="TEACHER",
-        email=payload.email,
-        phone=payload.phone,
-    )
-    db.add(user)
-    db.flush()  # get user.id for teacher FK without committing yet
-
-    teacher = Teacher(
-        school_id=school_id,
-        user_id=user.id,
-        name=payload.name,
-    )
-    db.add(teacher)
-    db.flush()
-
+    # 5. Create Primary Section Mapping
     mapping = TeacherPrimarySection(
-        school_id=school_id,
+        school_id=sid,
         teacher_id=teacher.id,
-        section_id=payload.section_id,
+        section_id=payload.section_id
     )
     db.add(mapping)
 
     db.commit()
-    db.refresh(user)
     db.refresh(teacher)
 
     return ManagementCreateTeacherOut(
-        user_id=user.id,
+        user_id=existing_user.id,
         teacher_id=teacher.id,
         name=teacher.name,
-        email=teacher.email,
-        phone=payload.phone,
-        section_id=payload.section_id,
+        email=existing_user.email,
+        phone=existing_user.phone,
+        section_id=payload.section_id
     )
+
+
+# Required to maintain compatibility with your app/api/v1/router.py
+router = router_mgmt
