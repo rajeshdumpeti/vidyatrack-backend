@@ -1,33 +1,23 @@
-from app.db import session
-from app.db.models.user import User
 import base64
 import hmac
 import json
-
-from sqlalchemy.orm import Session
-from app.db.models.user_school import UserSchool
-from app.db.session import SessionLocal
 from datetime import datetime, timezone
 from typing import Generator
-from app.db.session import SessionLocal
-from datetime import datetime, timezone
+
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from app.core.config import settings
+from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.db.session import SessionLocal
 from app.db.models.user import User
+from app.db.models.user_school import UserSchool
+
 security = HTTPBearer(auto_error=False)
 
 
 def get_db() -> Generator:
-    """
-    FastAPI dependency that provides a database session.
-
-    Why this exists:
-    - Ensures one DB session per request
-    - Guarantees session is closed after request
-    - Centralizes DB lifecycle management
-    """
+    """Provides a database session per request."""
     db = SessionLocal()
     try:
         yield db
@@ -41,6 +31,7 @@ def _b64url_decode(data: str) -> bytes:
 
 
 def _jwt_decode_hs256(token: str) -> dict:
+    """Manual JWT decoding to verify signature and expiration."""
     try:
         header_b64, payload_b64, sig_b64 = token.split(".")
     except ValueError:
@@ -73,7 +64,8 @@ def _jwt_decode_hs256(token: str) -> dict:
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
-) -> User:  # Returns the actual User object
+) -> User:
+    """Dependency to retrieve the authenticated user from the JWT."""
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_token")
@@ -90,33 +82,20 @@ def get_current_user(
 
     return user
 
+# --- ROLE-BASED ACCESS CONTROL ---
+
 
 def require_management(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role.lower() != "management":
+    if current_user.role.upper() != "MANAGEMENT":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="insufficient_permissions",
         )
     return current_user
 
-
-# --- FIXED DEPENDENCIES ---
 
 def require_teacher(current_user: User = Depends(get_current_user)) -> User:
-    # Use dot notation because current_user is a User object
     if current_user.role.upper() != "TEACHER":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="insufficient_permissions",
-        )
-    return current_user
-
-
-def require_teacher_or_management_or_principal(
-    current_user: User = Depends(get_current_user),
-) -> User:
-    # Use dot notation and .upper() for safety
-    if current_user.role.upper() not in ["TEACHER", "MANAGEMENT", "PRINCIPAL"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="insufficient_permissions",
@@ -133,16 +112,28 @@ def require_principal(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def require_teacher_or_management_or_principal(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if current_user.role.upper() not in ["TEACHER", "MANAGEMENT", "PRINCIPAL"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+    return current_user
+
+# --- SCHOOL CONTEXT VALIDATION ---
+
+
 def get_valid_school_id(
-    school_id: int = Query(...),  # Forces frontend to send ?school_id=X
+    school_id: int = Query(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> int:
     """
-    Dependency to verify the user has access to the requested school.
-    Returns the school_id if valid, otherwise raises 403.
+    Verifies the user has an explicit mapping to the school_id provided.
+    This prevents users from 'guessing' other school IDs in the query string.
     """
-    # Check the mapping table
     access = db.query(UserSchool).filter(
         UserSchool.user_id == current_user.id,
         UserSchool.school_id == school_id
@@ -151,7 +142,7 @@ def get_valid_school_id(
     if not access:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied for this school context."
+            detail=f"User {current_user.id} does not have access to school {school_id}."
         )
 
     return school_id

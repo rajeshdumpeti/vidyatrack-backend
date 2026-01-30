@@ -1,12 +1,11 @@
 from typing import List
-
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_db, get_current_user, require_management
+from app.api.v1.deps import get_db, get_current_user, require_management, get_valid_school_id
 from app.db.models.attendance_record import AttendanceRecord
 from app.db.models.class_ import Class
 from app.db.models.marks_record import MarksRecord
@@ -16,6 +15,8 @@ from app.db.models.subject import Subject
 from app.db.models.user import User
 
 router = APIRouter(prefix="/students", tags=["students"])
+
+# --- SCHEMAS ---
 
 
 class StudentCreate(BaseModel):
@@ -66,8 +67,7 @@ class StudentOut(BaseModel):
     parent_name: str | None = None
     status: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StudentPersonalDetails(BaseModel):
@@ -113,24 +113,24 @@ class StudentProfileOut(BaseModel):
     recent_results: list[StudentRecentResult]
 
 
-# ... (imports and schemas remain the same)
+# --- ROUTES ---
 
 @router.get("", response_model=List[StudentOut])
 def list_students(
     section_id: int | None = Query(None),
-    # Force school_id from query param for Management
-    school_id: int = Query(...),
     db: Session = Depends(get_db),
+    # Use school_id validation to ensure isolation and permission check
+    school_id: int = Depends(get_valid_school_id),
     current_user: User = Depends(get_current_user),
 ):
-    # Use the school_id from the query parameter to ensure isolation
-    sid = school_id
-
+    """
+    Lists students for a specific school and optionally filters by section.
+    """
     q = (
         db.query(Student, Section, Class)
         .outerjoin(Section, (Section.id == Student.section_id))
         .outerjoin(Class, (Class.id == Section.class_id))
-        .filter(Student.school_id == sid)
+        .filter(Student.school_id == school_id)
     )
 
     if section_id:
@@ -165,19 +165,18 @@ def list_students(
 @router.post("", response_model=StudentOut, status_code=201)
 def create_student(
     payload: StudentCreate,
-    school_id: int = Query(...),  # Capture school_id from URL query
     db: Session = Depends(get_db),
-    # Only management can create
+    # Force validation of the school where the student is being created
+    school_id: int = Depends(get_valid_school_id),
     current_user: User = Depends(require_management),
 ):
-    sid = school_id  # Use the ID from the query parameter
-
+    """Only management can create students within their school context."""
     if payload.section_id is not None:
         sec = (
             db.query(Section)
             .filter(
                 Section.id == payload.section_id,
-                Section.school_id == sid,  # Match against query sid
+                Section.school_id == school_id,
             )
             .first()
         )
@@ -191,7 +190,7 @@ def create_student(
     )
 
     student = Student(
-        school_id=sid,  # Assigned to the correct school context
+        school_id=school_id,
         name=full_name,
         first_name=payload.first_name,
         last_name=payload.last_name,
@@ -213,13 +212,15 @@ def create_student(
 def get_student_profile(
     student_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    school_id: int = Depends(get_valid_school_id),
+    current_user: User = Depends(get_current_user),
 ):
+    """Retrieves detailed student profile including attendance and marks."""
     student = (
         db.query(Student)
         .filter(
             Student.id == student_id,
-            Student.school_id == current_user["school_id"],
+            Student.school_id == school_id,
         )
         .first()
     )
@@ -233,7 +234,7 @@ def get_student_profile(
             db.query(Section)
             .filter(
                 Section.id == student.section_id,
-                Section.school_id == current_user["school_id"],
+                Section.school_id == school_id,
             )
             .first()
         )
@@ -242,7 +243,7 @@ def get_student_profile(
                 db.query(Class)
                 .filter(
                     Class.id == section.class_id,
-                    Class.school_id == current_user["school_id"],
+                    Class.school_id == school_id,
                 )
                 .first()
             )
@@ -250,7 +251,7 @@ def get_student_profile(
     present_days = (
         db.query(func.count(AttendanceRecord.id))
         .filter(
-            AttendanceRecord.school_id == current_user["school_id"],
+            AttendanceRecord.school_id == school_id,
             AttendanceRecord.student_id == student_id,
             AttendanceRecord.status == "present",
         )
@@ -260,7 +261,7 @@ def get_student_profile(
     absent_days = (
         db.query(func.count(AttendanceRecord.id))
         .filter(
-            AttendanceRecord.school_id == current_user["school_id"],
+            AttendanceRecord.school_id == school_id,
             AttendanceRecord.student_id == student_id,
             AttendanceRecord.status == "absent",
         )
@@ -281,10 +282,10 @@ def get_student_profile(
         .join(
             Subject,
             (Subject.id == MarksRecord.subject_id)
-            & (Subject.school_id == current_user["school_id"]),
+            & (Subject.school_id == school_id),
         )
         .filter(
-            MarksRecord.school_id == current_user["school_id"],
+            MarksRecord.school_id == school_id,
             MarksRecord.student_id == student_id,
         )
         .order_by(MarksRecord.created_at.desc())

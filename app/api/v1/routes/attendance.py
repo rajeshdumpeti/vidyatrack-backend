@@ -23,7 +23,9 @@ class AttendanceCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     student_id: int
     date: date_type
-    status: str  # "present" | "absent"
+    status: str
+    # Add this to prevent 'extra_forbidden' error
+    school_id: Optional[int] = None
 
 
 class AttendanceOut(BaseModel):
@@ -50,7 +52,6 @@ class AttendanceSubmissionOut(BaseModel):
     date: date_type
     submitted_by_user_id: int | None
     created_at: datetime
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -68,13 +69,8 @@ def list_attendance(
     date: date_type = Query(...),
     section_id: int = Query(...),
     db: Session = Depends(get_db),
-    # Use dependency to force validation of ?school_id=X
     school_id: int = Depends(get_valid_school_id),
 ):
-    """
-    Fetches existing records or generates a template based on the student list.
-    """
-    # 1. Try to find existing attendance records for the section/date
     records = (
         db.query(AttendanceRecord)
         .join(Student, Student.id == AttendanceRecord.student_id)
@@ -93,7 +89,6 @@ def list_attendance(
             r.student_name = student.name if student else "Unknown"
         return records
 
-    # 2. Fallback: Return a "present" template for all students in that section
     students = db.query(Student).filter(
         Student.section_id == section_id,
         Student.school_id == school_id
@@ -111,57 +106,51 @@ def list_attendance(
         ) for s in students
     ]
 
+# Change the POST route to handle the "upsert" logic as well
+# to prevent errors if the frontend double-posts.
+
 
 @router.post("", response_model=AttendanceOut, status_code=201)
 def create_attendance(
     payload: AttendanceCreate,
-    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     school_id: int = Depends(get_valid_school_id),
 ):
     """
-    Creates a single attendance record.
+    Handles POST requests. If a record already exists for this 
+    student/date, it updates it instead of failing.
     """
-    # Verify student exists within the specified school context
-    student = db.query(Student).filter(
-        Student.id == payload.student_id,
-        Student.school_id == school_id,
+    # 1. Check if it already exists (Idempotency)
+    row = db.query(AttendanceRecord).filter(
+        AttendanceRecord.student_id == payload.student_id,
+        AttendanceRecord.date == payload.date,
+        AttendanceRecord.school_id == school_id
     ).first()
 
-    if not student:
-        raise HTTPException(
-            status_code=400, detail="invalid_student_id_for_school")
+    if row:
+        # Update existing record (Fixes 409/Integrity errors)
+        row.status = payload.status.lower()
+        row.marked_by_user_id = current_user.id
+    else:
+        # Create new record
+        row = AttendanceRecord(
+            school_id=school_id,
+            student_id=payload.student_id,
+            date=payload.date,
+            status=payload.status.lower(),
+            marked_by_user_id=current_user.id,
+        )
+        db.add(row)
 
-    row = AttendanceRecord(
-        school_id=school_id,
-        student_id=payload.student_id,
-        date=payload.date,
-        status=payload.status,
-        marked_by_user_id=current_user.id,
-    )
-    db.add(row)
     try:
         db.commit()
         db.refresh(row)
         return row
     except IntegrityError:
         db.rollback()
-        # Handle existing record for idempotency/conflict resolution
-        existing = db.query(AttendanceRecord).filter(
-            AttendanceRecord.school_id == school_id,
-            AttendanceRecord.student_id == payload.student_id,
-            AttendanceRecord.date == payload.date,
-        ).first()
-
-        if existing:
-            if existing.status == payload.status:
-                response.status_code = status.HTTP_200_OK
-                return existing
-            else:
-                raise HTTPException(
-                    status_code=409, detail="conflicting_status")
-        raise HTTPException(status_code=400, detail="creation_failed")
+        raise HTTPException(
+            status_code=400, detail="attendance_creation_failed")
 
 
 @router.put("/{attendance_id}", response_model=AttendanceOut)
@@ -170,22 +159,58 @@ def update_attendance(
     payload: AttendanceUpdate,
     db: Session = Depends(get_db),
     school_id: int = Depends(get_valid_school_id),
+    current_user: User = Depends(get_current_user),
+    # These capture the extra info your frontend is already sending
+    student_id: Optional[int] = Query(None),
+    date: Optional[date_type] = Query(None),
 ):
     """
-    Updates status for an existing attendance record.
+    TECH LEAD FIX: If attendance_id is 0, we perform an UPSERT based on 
+    student_id and date.
     """
-    row = db.query(AttendanceRecord).filter(
-        AttendanceRecord.id == attendance_id,
-        AttendanceRecord.school_id == school_id
-    ).first()
+    row = None
 
+    # 1. Try to find existing record
+    if attendance_id > 0:
+        row = db.query(AttendanceRecord).filter(
+            AttendanceRecord.id == attendance_id,
+            AttendanceRecord.school_id == school_id
+        ).first()
+
+    # Fallback to student/date lookup if ID is 0 or not found
+    if not row and student_id and date:
+        row = db.query(AttendanceRecord).filter(
+            AttendanceRecord.student_id == student_id,
+            AttendanceRecord.date == date,
+            AttendanceRecord.school_id == school_id
+        ).first()
+
+    # 2. If no record exists, CREATE IT
     if not row:
-        raise HTTPException(status_code=404, detail="attendance_not_found")
+        if not (student_id and date):
+            raise HTTPException(
+                status_code=400, detail="missing_info_for_new_record")
 
-    row.status = payload.status
-    db.commit()
-    db.refresh(row)
-    return row
+        row = AttendanceRecord(
+            school_id=school_id,
+            student_id=student_id,
+            date=date,
+            status=payload.status.lower(),  # Normalize to lowercase if needed
+            marked_by_user_id=current_user.id
+        )
+        db.add(row)
+    else:
+        # 3. Update existing
+        row.status = payload.status.lower()
+        row.marked_by_user_id = current_user.id
+
+    try:
+        db.commit()
+        db.refresh(row)
+        return row
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/submit", response_model=AttendanceSubmissionOut, status_code=201)
@@ -196,10 +221,6 @@ def submit_attendance(
     current_user: User = Depends(get_current_user),
     school_id: int = Depends(get_valid_school_id),
 ):
-    """
-    Finalizes attendance for a section and queues parent notifications.
-    """
-    # 1. Check for existing submission
     existing = db.query(AttendanceSubmission).filter(
         AttendanceSubmission.school_id == school_id,
         AttendanceSubmission.section_id == payload.section_id,
@@ -210,7 +231,6 @@ def submit_attendance(
         response.status_code = status.HTTP_200_OK
         return existing
 
-    # 2. Create the Submission record
     new_sub = AttendanceSubmission(
         school_id=school_id,
         section_id=payload.section_id,
@@ -221,8 +241,6 @@ def submit_attendance(
 
     try:
         db.flush()
-
-        # 3. Queue notifications for the Outbox
         students = db.query(Student).filter(
             Student.school_id == school_id,
             Student.section_id == payload.section_id
@@ -236,9 +254,7 @@ def submit_attendance(
                 marks_submission_id=None,
                 recipient_phone=s.parent_phone,
                 payload=json.dumps({
-                    "type": "attendance",
-                    "student": s.name,
-                    "date": str(payload.date)
+                    "type": "attendance", "student": s.name, "date": str(payload.date)
                 }),
                 status="PENDING"
             ))
@@ -246,7 +262,6 @@ def submit_attendance(
         db.commit()
         db.refresh(new_sub)
         return new_sub
-
     except IntegrityError:
         db.rollback()
         final_check = db.query(AttendanceSubmission).filter(
