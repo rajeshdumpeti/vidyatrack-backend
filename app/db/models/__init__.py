@@ -15,3 +15,4 @@ from app.db.models.notification_outbox import NotificationOutbox  # noqa: F401
 from app.db.models.teacher_primary_section import TeacherPrimarySection
 from app.db.models.section_subject_teacher import SectionSubjectTeacher
 from app.db.models.user_school import UserSchool
+from app.db.models.teacher_section_assignment import TeacherSectionAssignment
