@@ -16,3 +16,6 @@ from app.db.models.teacher_primary_section import TeacherPrimarySection
 from app.db.models.section_subject_teacher import SectionSubjectTeacher
 from app.db.models.user_school import UserSchool
 from app.db.models.teacher_section_assignment import TeacherSectionAssignment
+from app.db.models.homework_broadcast import HomeworkBroadcast
+from app.db.models.parent_message import ParentMessage
+from app.db.models.parent_message_recipient import ParentMessageRecipient
