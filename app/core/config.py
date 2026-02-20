@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     jwt_ttl_minutes: int = Field(default=30, alias="JWT_TTL_MINUTES")
     otp_pepper: str = Field(default="change_me", alias="OTP_PEPPER")
     otp_ttl_minutes: int = Field(default=5, alias="OTP_TTL_MINUTES")
+    # CMS (Strapi)
+    strapi_base_url: str = Field(default="http://localhost:1337/api", alias="STRAPI_BASE_URL")
+    strapi_api_token: str = Field(default="", alias="STRAPI_API_TOKEN")
+    strapi_timeout_seconds: int = Field(default=10, alias="STRAPI_TIMEOUT_SECONDS")
 
 
     # Pydantic v2 settings configuration

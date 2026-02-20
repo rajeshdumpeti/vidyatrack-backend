@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, ForeignKey, String
+from sqlalchemy import Boolean, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -21,7 +21,15 @@ class User(Base):
 
     email: Mapped[str | None] = mapped_column(
         String(255), nullable=True, index=True)
-    # MVP roles: SUPER_ADMIN | MANAGEMENT | PRINCIPAL | TEACHER
+    # MVP roles: super_admin | management | principal | teacher
     role: Mapped[str] = mapped_column(String(32), nullable=False)
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True)
+
+    # Optional permissions/quota for platform admins (nullable for legacy)
+    can_create_school: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    max_schools: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, default=None
+    )

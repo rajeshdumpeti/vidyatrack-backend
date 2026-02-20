@@ -58,7 +58,7 @@ def create_school(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Only you (SUPER_ADMIN) should be able to create new schools
+    # Only you (super_admin) should be able to create new schools
     if current_user.role != "super_admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

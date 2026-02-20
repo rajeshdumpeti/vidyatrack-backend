@@ -21,6 +21,8 @@ from app.api.v1.routes import management_principal
 from app.api.v1.routes import management_dashboard
 from app.api.v1.routes import principal_dashboard
 from app.api.v1.routes import communications
+from app.api.v1.routes import school_onboarding
+from app.api.v1.routes import cms
 
 api_router = APIRouter()
 
@@ -46,3 +48,5 @@ api_router.include_router(management_principal.router)
 api_router.include_router(management_dashboard.router)
 api_router.include_router(principal_dashboard.router)
 api_router.include_router(communications.router)
+api_router.include_router(school_onboarding.router)
+api_router.include_router(cms.router)

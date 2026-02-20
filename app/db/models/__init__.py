@@ -19,3 +19,9 @@ from app.db.models.teacher_section_assignment import TeacherSectionAssignment
 from app.db.models.homework_broadcast import HomeworkBroadcast
 from app.db.models.parent_message import ParentMessage
 from app.db.models.parent_message_recipient import ParentMessageRecipient
+from app.db.models.school_contact import SchoolContact
+from app.db.models.school_academic_details import SchoolAcademicDetails
+from app.db.models.school_features import SchoolFeatures
+from app.db.models.management_admin import ManagementAdmin
+from app.db.models.school_onboarding_draft import SchoolOnboardingDraft
+from app.db.models.idempotency_key import IdempotencyKey
