@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -20,6 +21,19 @@ class SchoolCreate(BaseModel):
 class SchoolOut(BaseModel):
     id: int
     name: str
+    code: str | None = None
+    board: str | None = None
+    category: str | None = None
+    medium: str | None = None
+    school_type: str | None = None
+    established_year: int | None = None
+    affiliation_number: str | None = None
+    udise_code: str | None = None
+    status: str
+    created_by: int | None = None
+    updated_by: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     teacher_count: int = 0
     student_count: int = 0
 

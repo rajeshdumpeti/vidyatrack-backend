@@ -18,6 +18,16 @@ class OtpRequest(Base):
 
     attempt_count: Mapped[int] = mapped_column(nullable=False, default=0)
 
+    channel: Mapped[str] = mapped_column(String(16), nullable=False, default="WHATSAPP")
+
+    provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="PENDING")
+
+    attempts: Mapped[int] = mapped_column(nullable=False, default=0)
+
+    sent_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+
     consumed_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
 
     created_at: Mapped["DateTime"] = mapped_column(

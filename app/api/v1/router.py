@@ -12,7 +12,6 @@ from app.api.v1.routes import attendance
 from app.api.v1.routes import subjects
 from app.api.v1.routes import marks
 from app.api.v1.routes import notifications
-from app.api.v1.routes import teacher_me
 from app.api.v1.routes import student_notes
 from app.api.v1.routes import teaching_assignments
 from app.api.v1.routes import management_teachers
@@ -23,6 +22,7 @@ from app.api.v1.routes import principal_dashboard
 from app.api.v1.routes import communications
 from app.api.v1.routes import school_onboarding
 from app.api.v1.routes import cms
+from app.api.v1.routes import academic_setup
 
 api_router = APIRouter()
 
@@ -39,7 +39,6 @@ api_router.include_router(attendance.router)
 api_router.include_router(subjects.router)
 api_router.include_router(marks.router)
 api_router.include_router(notifications.router)
-api_router.include_router(teacher_me.router)
 api_router.include_router(student_notes.router)
 api_router.include_router(teaching_assignments.router)
 api_router.include_router(management_teachers.router)
@@ -50,3 +49,4 @@ api_router.include_router(principal_dashboard.router)
 api_router.include_router(communications.router)
 api_router.include_router(school_onboarding.router)
 api_router.include_router(cms.router)
+api_router.include_router(academic_setup.router)

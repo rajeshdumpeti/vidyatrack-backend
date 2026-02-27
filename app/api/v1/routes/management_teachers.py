@@ -13,6 +13,7 @@ from app.db.models.teacher import Teacher
 from app.db.models.teacher_primary_section import TeacherPrimarySection
 from app.db.models.section import Section
 from app.db.models.user import User
+from app.db.models.user_school import UserSchool
 
 router_mgmt = APIRouter(prefix="/management/teachers",
                         tags=["management-teachers"])
@@ -84,6 +85,19 @@ def management_create_teacher(
 
     teacher = None
     if existing_user:
+        # Ensure school access mapping exists for this teacher user.
+        existing_access = (
+            db.query(UserSchool)
+            .filter(
+                UserSchool.user_id == existing_user.id,
+                UserSchool.school_id == sid,
+            )
+            .first()
+        )
+        if not existing_access:
+            db.add(UserSchool(user_id=existing_user.id,
+                   school_id=sid, role="teacher"))
+
         # Check if they are already a teacher in THIS school
         teacher = (
             db.query(Teacher)
@@ -126,6 +140,8 @@ def management_create_teacher(
         db.add(new_user)
         db.flush()
         existing_user = new_user
+        db.add(UserSchool(user_id=existing_user.id,
+               school_id=sid, role="teacher"))
 
     # 4. Create Teacher record
     if not teacher:
