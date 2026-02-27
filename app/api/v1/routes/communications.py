@@ -52,9 +52,12 @@ class ParentMessageCreate(BaseModel):
 
 
 class ParentMessageOut(BaseModel):
+    id: int
     message_id: int
     school_id: int
     section_id: int
+    subject: str | None = None
+    message: str
     student_ids: List[int]
     delivered_count: int
     created_by: int | None
@@ -264,9 +267,12 @@ def create_parent_message(
     db.refresh(msg)
 
     return ParentMessageOut(
+        id=msg.id,
         message_id=msg.id,
         school_id=msg.school_id,
         section_id=msg.section_id,
+        subject=msg.subject,
+        message=msg.message,
         student_ids=unique_student_ids,
         delivered_count=len(unique_student_ids),
         created_by=msg.created_by_user_id,
@@ -310,9 +316,12 @@ def list_parent_messages(
 
     return [
         ParentMessageOut(
+            id=m.id,
             message_id=m.id,
             school_id=m.school_id,
             section_id=m.section_id,
+            subject=m.subject,
+            message=m.message,
             student_ids=recipients_by_msg.get(m.id, []),
             delivered_count=len(recipients_by_msg.get(m.id, [])),
             created_by=m.created_by_user_id,
