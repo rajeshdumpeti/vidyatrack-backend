@@ -12,6 +12,11 @@ logger = logging.getLogger(__name__)
 
 setup_logging()
 
+
+def _parse_cors_origins(raw: str) -> list[str]:
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return origins or ["http://localhost:5173", "http://127.0.0.1:5173"]
+
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
@@ -19,13 +24,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-
-        # Vercel Dev
-        "https://vidyatrack-dev.vercel.app",
-    ],
+    allow_origins=_parse_cors_origins(settings.cors_allow_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

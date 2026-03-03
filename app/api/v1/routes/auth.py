@@ -95,6 +95,7 @@ def request_otp(
     trace_id = request.headers.get("x-request-id", "n/a")
     normalized_phone = normalize_phone_for_otp(payload.phone)
     country_code = phone_country_code(normalized_phone)
+    delivery_mode = settings.otp_delivery_mode.strip().lower()
     now = datetime.now(timezone.utc)
 
     recent_cutoff = now - timedelta(seconds=OTP_RATE_LIMIT_SECONDS)
@@ -171,7 +172,7 @@ def request_otp(
         row.id,
     )
 
-    if settings.otp_delivery_mode.strip().lower() == "local_log_only":
+    if delivery_mode == "local_log_only":
         row.status = "SENT"
         row.channel = "LOCAL"
         row.provider_message_id = "local_log_only"
@@ -192,6 +193,76 @@ def request_otp(
         )
         # Keep response shape stable for frontend.
         return {"status": "otp_sent", "delivery_channel": "whatsapp"}
+
+    if delivery_mode == "email_only":
+        user = (
+            db.query(User)
+            .filter(User.is_active.is_(True))
+            .filter(User.phone.in_(phone_candidates(normalized_phone)))
+            .first()
+        )
+        email = getattr(user, "email", None) if user else None
+
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="email_not_found_for_phone",
+            )
+
+        try:
+            email_result = send_otp_email(to_email=email, otp=otp)
+        except Exception:
+            row.status = "FAILED"
+            db.add(row)
+            db.commit()
+            logger.exception(
+                (
+                    "email otp send failed trace_id=%s phone_country_code=%s "
+                    "phone_last4=%s otp_request_id=%s mapped_backend_error_code=%s"
+                ),
+                trace_id,
+                country_code,
+                _phone_last4(normalized_phone),
+                row.id,
+                "email_delivery_failed",
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="email_delivery_failed",
+            )
+
+        logger.info(
+            (
+                "email otp send attempted trace_id=%s phone_country_code=%s phone_last4=%s "
+                "otp_request_id=%s email_status_code=%s provider_message_id=%s "
+                "provider_error_code=%s provider_error_message=%s"
+            ),
+            trace_id,
+            country_code,
+            _phone_last4(normalized_phone),
+            row.id,
+            email_result.status_code,
+            email_result.provider_message_id,
+            email_result.provider_error_code,
+            email_result.provider_error_message,
+        )
+
+        if email_result.success:
+            row.status = "SENT"
+            row.channel = "EMAIL"
+            row.provider_message_id = email_result.provider_message_id
+            row.sent_at = datetime.now(timezone.utc)
+            db.add(row)
+            db.commit()
+            return {"status": "otp_sent", "delivery_channel": "email"}
+
+        row.status = "FAILED"
+        db.add(row)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="email_delivery_failed",
+        )
 
     wa_result = None
     try:

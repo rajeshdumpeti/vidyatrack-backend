@@ -33,6 +33,9 @@ class AttendanceOut(BaseModel):
     school_id: int
     student_id: int
     student_name: Optional[str] = None
+    section_id: Optional[int] = None
+    class_name: Optional[str] = None
+    section_name: Optional[str] = None
     date: date_type
     status: str
     marked_by_user_id: Optional[int] = None
@@ -67,43 +70,122 @@ class AttendanceUpdate(BaseModel):
 @router.get("", response_model=List[AttendanceOut])
 def list_attendance(
     date: date_type = Query(...),
-    section_id: int = Query(...),
+    section_id: int | None = Query(None),
     db: Session = Depends(get_db),
     school_id: int = Depends(get_valid_school_id),
 ):
-    records = (
-        db.query(AttendanceRecord)
+    records_query = (
+        db.query(
+            AttendanceRecord,
+            Student.name.label("student_name"),
+            Student.section_id.label("section_id"),
+        )
         .join(Student, Student.id == AttendanceRecord.student_id)
         .filter(
             AttendanceRecord.school_id == school_id,
             AttendanceRecord.date == date,
-            Student.section_id == section_id
         )
-        .all()
     )
+    if section_id is not None:
+        records_query = records_query.filter(Student.section_id == section_id)
+
+    records = records_query.all()
 
     if records:
-        for r in records:
-            student = db.query(Student).filter(
-                Student.id == r.student_id).first()
-            r.student_name = student.name if student else "Unknown"
-        return records
+        section_ids = {
+            student_section_id
+            for _, _, student_section_id in records
+            if student_section_id is not None
+        }
+        section_meta = {}
+        if section_ids:
+            from app.db.models.section import Section
+            from app.db.models.class_ import Class
 
-    students = db.query(Student).filter(
-        Student.section_id == section_id,
-        Student.school_id == school_id
-    ).all()
+            section_rows = (
+                db.query(
+                    Section.id.label("section_id"),
+                    Section.name.label("section_name"),
+                    Class.name.label("class_name"),
+                )
+                .join(Class, Class.id == Section.class_id)
+                .filter(
+                    Section.school_id == school_id,
+                    Section.id.in_(section_ids),
+                )
+                .all()
+            )
+            section_meta = {
+                row.section_id: {
+                    "class_name": row.class_name,
+                    "section_name": row.section_name,
+                }
+                for row in section_rows
+            }
+
+        return [
+            AttendanceOut(
+                id=record.id,
+                school_id=record.school_id,
+                student_id=record.student_id,
+                student_name=student_name,
+                section_id=student_section_id,
+                class_name=section_meta.get(student_section_id, {}).get("class_name"),
+                section_name=section_meta.get(student_section_id, {}).get("section_name"),
+                date=record.date,
+                status=record.status,
+                marked_by_user_id=record.marked_by_user_id,
+            )
+            for record, student_name, student_section_id in records
+        ]
+
+    students_query = db.query(Student).filter(Student.school_id == school_id)
+    if section_id is not None:
+        students_query = students_query.filter(Student.section_id == section_id)
+
+    students = students_query.all()
+
+    section_ids = {student.section_id for student in students if student.section_id is not None}
+    section_meta = {}
+    if section_ids:
+        from app.db.models.section import Section
+        from app.db.models.class_ import Class
+
+        section_rows = (
+            db.query(
+                Section.id.label("section_id"),
+                Section.name.label("section_name"),
+                Class.name.label("class_name"),
+            )
+            .join(Class, Class.id == Section.class_id)
+            .filter(
+                Section.school_id == school_id,
+                Section.id.in_(section_ids),
+            )
+            .all()
+        )
+        section_meta = {
+            row.section_id: {
+                "class_name": row.class_name,
+                "section_name": row.section_name,
+            }
+            for row in section_rows
+        }
 
     return [
         AttendanceOut(
             id=0,
             school_id=school_id,
-            student_id=s.id,
-            student_name=s.name,
+            student_id=student.id,
+            student_name=student.name,
+            section_id=student.section_id,
+            class_name=section_meta.get(student.section_id, {}).get("class_name"),
+            section_name=section_meta.get(student.section_id, {}).get("section_name"),
             date=date,
             status="present",
-            marked_by_user_id=None
-        ) for s in students
+            marked_by_user_id=None,
+        )
+        for student in students
     ]
 
 # Change the POST route to handle the "upsert" logic as well

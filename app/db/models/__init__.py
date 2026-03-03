@@ -25,3 +25,4 @@ from app.db.models.school_features import SchoolFeatures
 from app.db.models.management_admin import ManagementAdmin
 from app.db.models.school_onboarding_draft import SchoolOnboardingDraft
 from app.db.models.idempotency_key import IdempotencyKey
+from app.db.models.student_import_batch import StudentImportBatch

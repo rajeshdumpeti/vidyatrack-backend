@@ -3,10 +3,13 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_db, get_current_user
+from app.api.v1.deps import get_db, get_current_user, require_super_admin
 from app.db.models.school import School
+from app.db.models.student import Student
+from app.db.models.teacher import Teacher
 from app.db.models.user import User  # Import User model to create the admin
 from app.db.models.user_school import UserSchool
 
@@ -41,6 +44,49 @@ class SchoolOut(BaseModel):
         from_attributes = True
 
 
+class SchoolDashboardOut(BaseModel):
+    school_id: int
+    teacher_count: int
+    student_count: int
+    staff_count: int
+    total_registered: int
+
+
+class SchoolTeacherListItem(BaseModel):
+    id: int
+    school_id: int
+    name: str
+    email: str | None = None
+    phone: str | None = None
+    status: str = "active"
+
+
+class SchoolStudentListItem(BaseModel):
+    id: int
+    school_id: int
+    name: str
+    parent_name: str | None = None
+    parent_phone: str | None = None
+    status: str = "active"
+
+
+class SchoolStaffListItem(BaseModel):
+    user_id: int
+    school_id: int
+    role: str
+    name: str
+    email: str | None = None
+    phone: str | None = None
+    status: str = "active"
+
+
+def _get_school_or_404(db: Session, school_id: int) -> School:
+    school = db.query(School).filter(School.id == school_id).first()
+    if not school:
+        raise HTTPException(status_code=404, detail="school_not_found")
+    return school
+
+
 @router.get("", response_model=List[SchoolOut])
 def list_schools(
     db: Session = Depends(get_db),
@@ -64,6 +110,135 @@ def list_schools(
         ).count()
 
     return schools
+
+
+@router.get("/{school_id}/dashboard", response_model=SchoolDashboardOut)
+def get_school_dashboard(
+    school_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_super_admin),
+):
+    _get_school_or_404(db, school_id)
+
+    teacher_count = (
+        db.query(func.count(Teacher.id))
+        .filter(Teacher.school_id == school_id)
+        .scalar()
+        or 0
+    )
+    student_count = (
+        db.query(func.count(Student.id))
+        .filter(Student.school_id == school_id)
+        .scalar()
+        or 0
+    )
+    staff_count = (
+        db.query(func.count(UserSchool.id))
+        .filter(
+            UserSchool.school_id == school_id,
+            func.lower(UserSchool.role).notin_(["teacher", "student"]),
+        )
+        .scalar()
+        or 0
+    )
+
+    return SchoolDashboardOut(
+        school_id=school_id,
+        teacher_count=teacher_count,
+        student_count=student_count,
+        staff_count=staff_count,
+        total_registered=teacher_count + student_count + staff_count,
+    )
+
+
+@router.get("/{school_id}/teachers", response_model=List[SchoolTeacherListItem])
+def get_school_teachers(
+    school_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_super_admin),
+):
+    _get_school_or_404(db, school_id)
+
+    rows = (
+        db.query(Teacher, User)
+        .outerjoin(User, Teacher.user_id == User.id)
+        .filter(Teacher.school_id == school_id)
+        .order_by(Teacher.id.asc())
+        .all()
+    )
+
+    return [
+        SchoolTeacherListItem(
+            id=teacher.id,
+            school_id=teacher.school_id,
+            name=teacher.name,
+            email=teacher.email or (user.email if user else None),
+            phone=(user.phone if user else None),
+            status="active" if (not user or user.is_active) else "inactive",
+        )
+        for teacher, user in rows
+    ]
+
+
+@router.get("/{school_id}/students", response_model=List[SchoolStudentListItem])
+def get_school_students(
+    school_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_super_admin),
+):
+    _get_school_or_404(db, school_id)
+
+    students = (
+        db.query(Student)
+        .filter(Student.school_id == school_id)
+        .order_by(Student.id.asc())
+        .all()
+    )
+
+    return [
+        SchoolStudentListItem(
+            id=student.id,
+            school_id=student.school_id,
+            name=student.name,
+            parent_name=student.parent_name,
+            parent_phone=student.parent_phone,
+            status="active",
+        )
+        for student in students
+    ]
+
+
+@router.get("/{school_id}/staff", response_model=List[SchoolStaffListItem])
+def get_school_staff(
+    school_id: int,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_super_admin),
+):
+    _get_school_or_404(db, school_id)
+
+    rows = (
+        db.query(UserSchool, User)
+        .join(User, UserSchool.user_id == User.id)
+        .filter(
+            UserSchool.school_id == school_id,
+            func.lower(UserSchool.role).notin_(["teacher", "student"]),
+        )
+        .order_by(UserSchool.id.asc())
+        .all()
+    )
+
+    return [
+        SchoolStaffListItem(
+            user_id=user.id,
+            school_id=link.school_id,
+            role=link.role,
+            name=(user.email or user.phone or f"User {user.id}"),
+            email=user.email,
+            phone=user.phone,
+            status="active" if user.is_active else "inactive",
+        )
+        for link, user in rows
+    ]
 
 
 @router.post("", response_model=SchoolOut, status_code=201)

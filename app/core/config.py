@@ -25,7 +25,8 @@ class Settings(BaseSettings):
     otp_ttl_minutes: int = Field(default=5, alias="OTP_TTL_MINUTES")
     # provider -> use WhatsApp/Brevo
     # local_log_only -> skip providers and print OTP in backend logs
-    otp_delivery_mode: str = Field(default="provider", alias="OTP_DELIVERY_MODE")
+    otp_delivery_mode: str = Field(
+        default="provider", alias="OTP_DELIVERY_MODE")
     otp_debug_log_plaintext: bool = Field(
         default=False, alias="OTP_DEBUG_LOG_PLAINTEXT")
     # WhatsApp Cloud API
@@ -55,6 +56,14 @@ class Settings(BaseSettings):
         default="VidyaTrack", alias="BREVO_SENDER_NAME")
     brevo_otp_subject: str = Field(
         default="Your VidyaTrack OTP", alias="BREVO_OTP_SUBJECT")
+    cors_allow_origins: str = Field(
+        default=(
+            "http://localhost:5173,"
+            "http://127.0.0.1:5173,"
+            "https://vidyatrack-dev.vercel.app"
+        ),
+        alias="CORS_ALLOW_ORIGINS",
+    )
 
     # Pydantic v2 settings configuration
     model_config = SettingsConfigDict(
