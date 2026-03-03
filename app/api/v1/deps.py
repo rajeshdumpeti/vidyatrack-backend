@@ -112,6 +112,15 @@ def require_principal(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.role.upper() != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+    return current_user
+
+
 def require_teacher_or_management_or_principal(
     current_user: User = Depends(get_current_user),
 ) -> User:

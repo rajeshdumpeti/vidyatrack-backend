@@ -1,7 +1,7 @@
 import json
 import re
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict
@@ -12,12 +12,14 @@ from app.api.v1.deps import get_db, get_current_user
 from app.db.models.marks_record import MarksRecord
 from app.db.models.marks_submission import MarksSubmission
 from app.db.models.notification_outbox import NotificationOutbox
+from app.db.models.class_ import Class
 from app.db.models.section import Section
 from app.db.models.student import Student
 from app.db.models.subject import Subject
 from app.db.models.user import User
 
 router = APIRouter(prefix="/marks", tags=["marks"])
+MARKS_CORRECTION_WINDOW_DAYS = 7
 
 
 def _normalize_exam_type(value: str) -> str:
@@ -26,6 +28,14 @@ def _normalize_exam_type(value: str) -> str:
     if not normalized:
         raise HTTPException(status_code=422, detail="invalid_exam_type")
     return normalized[:32]
+
+
+def _is_submission_locked(submission: MarksSubmission) -> bool:
+    cutoff = submission.created_at + timedelta(days=MARKS_CORRECTION_WINDOW_DAYS)
+    now = datetime.now(timezone.utc)
+    if cutoff.tzinfo is None:
+        return datetime.utcnow() > cutoff.replace(tzinfo=None)
+    return now > cutoff
 
 # --- SCHEMAS ---
 
@@ -55,6 +65,11 @@ class MarksRecordOut(BaseModel):
     marks_obtained: int
     max_marks: int
     recorded_by_user_id: int | None
+    student_name: str | None = None
+    roll_no: str | None = None
+    class_name: str | None = None
+    section_name: str | None = None
+    subject_name: str | None = None
     created_at: datetime  # FIX: Added for serialization
     model_config = ConfigDict(from_attributes=True)
 
@@ -138,6 +153,41 @@ def record_marks(
 
     exam_type = _normalize_exam_type(payload.exam_type)
 
+    existing = db.query(MarksRecord).filter(
+        MarksRecord.school_id == school_id,
+        MarksRecord.student_id == payload.student_id,
+        MarksRecord.subject_id == payload.subject_id,
+        MarksRecord.exam_type == exam_type,
+    ).first()
+
+    if existing:
+        if (
+            existing.marks_obtained == payload.marks_obtained
+            and existing.max_marks == payload.max_marks
+        ):
+            response.status_code = 200
+            return existing
+
+        submission = db.query(MarksSubmission).filter(
+            MarksSubmission.school_id == school_id,
+            MarksSubmission.section_id == student.section_id,
+            MarksSubmission.subject_id == payload.subject_id,
+            MarksSubmission.exam_type == exam_type,
+        ).first()
+        if submission and _is_submission_locked(submission):
+            raise HTTPException(
+                status_code=409,
+                detail="marks_locked_after_7_days",
+            )
+
+        existing.marks_obtained = payload.marks_obtained
+        existing.max_marks = payload.max_marks
+        existing.recorded_by_user_id = current_user.id
+        db.commit()
+        db.refresh(existing)
+        response.status_code = 200
+        return existing
+
     row = MarksRecord(
         school_id=school_id,
         student_id=payload.student_id,
@@ -153,15 +203,6 @@ def record_marks(
         db.commit()
     except IntegrityError:
         db.rollback()
-        existing = db.query(MarksRecord).filter(
-            MarksRecord.school_id == school_id,
-            MarksRecord.student_id == payload.student_id,
-            MarksRecord.subject_id == payload.subject_id,
-            MarksRecord.exam_type == exam_type,
-        ).first()
-        if existing and existing.marks_obtained == payload.marks_obtained:
-            response.status_code = 200
-            return existing
         raise HTTPException(status_code=409, detail="conflicting_marks")
 
     db.refresh(row)
@@ -221,7 +262,7 @@ def submit_marks(
 @router.get("", response_model=List[MarksRecordOut])
 def list_marks(
     school_id: int,  # FIX: Consistent with Attendance
-    section_id: int = Query(...),
+    section_id: int | None = Query(None),
     subject_id: int = Query(...),
     exam_type: str = Query(...),
     db: Session = Depends(get_db),
@@ -229,13 +270,61 @@ def list_marks(
 ):
     normalized_exam_type = _normalize_exam_type(exam_type)
 
-    return (
-        db.query(MarksRecord)
+    if section_id is not None:
+        section_exists = (
+            db.query(Section.id)
+            .filter(Section.school_id == school_id, Section.id == section_id)
+            .first()
+        )
+        if not section_exists:
+            raise HTTPException(status_code=400, detail="invalid_section_id")
+
+    q = (
+        db.query(
+            MarksRecord,
+            Student.name.label("student_name"),
+            Student.roll_number.label("roll_no"),
+            Class.name.label("class_name"),
+            Section.name.label("section_name"),
+            Subject.name.label("subject_name"),
+        )
+        .join(Student, Student.id == MarksRecord.student_id)
+        .join(Section, Section.id == Student.section_id, isouter=True)
+        .join(Class, Class.id == Section.class_id, isouter=True)
+        .join(
+            Subject,
+            (Subject.id == MarksRecord.subject_id)
+            & (Subject.school_id == school_id),
+        )
         .filter(
             MarksRecord.school_id == school_id,
+            Student.school_id == school_id,
             MarksRecord.subject_id == subject_id,
             MarksRecord.exam_type == normalized_exam_type,
         )
         .order_by(MarksRecord.id.asc())
-        .all()
     )
+
+    if section_id is not None:
+        q = q.filter(Student.section_id == section_id)
+
+    rows = q.all()
+    return [
+        MarksRecordOut(
+            id=record.id,
+            school_id=record.school_id,
+            student_id=record.student_id,
+            subject_id=record.subject_id,
+            exam_type=record.exam_type,
+            marks_obtained=record.marks_obtained,
+            max_marks=record.max_marks,
+            recorded_by_user_id=record.recorded_by_user_id,
+            student_name=student_name,
+            roll_no=str(roll_no) if roll_no is not None else None,
+            class_name=class_name,
+            section_name=section_name,
+            subject_name=subject_name,
+            created_at=record.created_at,
+        )
+        for record, student_name, roll_no, class_name, section_name, subject_name in rows
+    ]

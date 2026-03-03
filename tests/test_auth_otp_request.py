@@ -206,3 +206,46 @@ def test_otp_request_falls_back_to_email_when_whatsapp_raises(otp_client, monkey
 
     assert response.status_code == 200
     assert response.json() == {"status": "otp_sent", "delivery_channel": "email"}
+
+
+def test_otp_request_email_only_mode(otp_client, monkeypatch):
+    client, session_factory = otp_client
+    db = session_factory()
+    try:
+        db.add(
+            User(
+                phone="+16195550000",
+                email="emailonly@example.com",
+                role="management",
+                is_active=True,
+                can_create_school=False,
+                max_schools=None,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    class _EmailResult:
+        success = True
+        provider_message_id = "email-only-1"
+        status_code = 201
+        provider_error_code = None
+        provider_error_message = None
+
+    def _mock_email_send(to_email: str, otp: str):
+        assert to_email == "emailonly@example.com"
+        assert len(otp) == 4
+        return _EmailResult()
+
+    monkeypatch.setattr("app.api.v1.routes.auth.settings.otp_delivery_mode", "email_only")
+    monkeypatch.setattr("app.api.v1.routes.auth.send_otp_email", _mock_email_send)
+
+    response = client.post(
+        "/api/v1/auth/otp/request",
+        json={"phone": "+16195550000"},
+        headers={"x-request-id": "test-email-only"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "otp_sent", "delivery_channel": "email"}
