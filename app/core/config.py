@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="vidyatrack-backend", alias="APP_NAME")
     environment: str = Field(default="dev", alias="ENVIRONMENT")
     debug: bool = Field(default=True, alias="DEBUG")
+    database_url: str | None = Field(default=None, alias="DATABASE_URL")
     db_host: str = Field(default="127.0.0.1", alias="DB_HOST")
     db_port: int = Field(default=5432, alias="DB_PORT")
     db_name: str = Field(default="vidyatrack", alias="DB_NAME")
