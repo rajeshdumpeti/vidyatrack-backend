@@ -26,3 +26,5 @@ from app.db.models.management_admin import ManagementAdmin
 from app.db.models.school_onboarding_draft import SchoolOnboardingDraft
 from app.db.models.idempotency_key import IdempotencyKey
 from app.db.models.student_import_batch import StudentImportBatch
+from app.db.models.principal_assignment_history import PrincipalAssignmentHistory
+from app.db.models.principal_onboarding_session import PrincipalOnboardingSession
