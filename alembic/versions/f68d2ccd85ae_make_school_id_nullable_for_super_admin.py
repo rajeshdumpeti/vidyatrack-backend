@@ -56,7 +56,7 @@ def upgrade() -> None:
             op.drop_constraint('uq_teachers_user_id', 'teachers', type_='unique')
         teacher_indexes = {i["name"] for i in inspector.get_indexes('teachers')}
         ix_name = op.f('ix_teachers_user_id')
-        if ix_name not in teacher_indexes:
+        if 'user_id' in teacher_cols and ix_name not in teacher_indexes:
             op.create_index(ix_name, 'teachers', ['user_id'], unique=True)
 
     if 'users' in table_names:
