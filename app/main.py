@@ -15,7 +15,12 @@ setup_logging()
 
 def _parse_cors_origins(raw: str) -> list[str]:
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    return origins or ["http://localhost:5173", "http://127.0.0.1:5173"]
+    return origins or [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://vidyatrack-dev.vercel.app"
+    ]
+
 
 app = FastAPI(
     title=settings.app_name,
