@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -10,6 +10,8 @@ from app.api.v1.deps import get_db, require_principal
 from app.db.models.attendance_record import AttendanceRecord
 from app.db.models.student import Student
 from app.db.models.teacher import Teacher
+from app.db.models.user import User
+from app.db.models.user_school import UserSchool
 
 router = APIRouter(prefix="/principal/dashboard",
                    tags=["principal-dashboard"])
@@ -36,9 +38,16 @@ class PrincipalDashboardOut(BaseModel):
 @router.get("", response_model=PrincipalDashboardOut)
 def get_principal_dashboard(
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_principal),
+    current_user: User = Depends(require_principal),
 ):
-    school_id = current_user["school_id"]
+    links = db.query(UserSchool).filter(UserSchool.user_id == current_user.id).all()
+    if not links:
+        raise HTTPException(status_code=403, detail="missing_school_context")
+    principal_link = next(
+        (link for link in links if str(link.role).upper() == "PRINCIPAL"),
+        None,
+    )
+    school_id = principal_link.school_id if principal_link else links[0].school_id
     today = datetime.now(timezone.utc).date()
 
     total_students = (

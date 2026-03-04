@@ -1,27 +1,40 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+import hashlib
+import hmac
+import logging
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_db, require_management
+from app.api.v1.routes.auth import OtpRequestIn, request_otp
+from app.core.config import settings
+from app.core.phone import normalize_phone_for_otp, phone_candidates
+from app.db.models.otp_request import OtpRequest
 from app.db.models.principal import Principal
+from app.db.models.principal_assignment_history import PrincipalAssignmentHistory
+from app.db.models.principal_onboarding_session import PrincipalOnboardingSession
 from app.db.models.user import User
+from app.db.models.user_school import UserSchool
 
-router = APIRouter(prefix="/management/principal",
-                   tags=["management-principal"])
+router = APIRouter(prefix="/management/principal", tags=["management-principal"])
+logger = logging.getLogger(__name__)
 
 
 class ManagementPrincipalIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    school_id: int = Field(gt=0)
     name: str = Field(min_length=1, max_length=200)
     phone: str = Field(min_length=10, max_length=20)
     email: str | None = Field(default=None, min_length=5, max_length=255)
 
     @model_validator(mode="after")
     def normalize(self) -> "ManagementPrincipalIn":
-        self.phone = self.phone.strip()
+        self.phone = normalize_phone_for_otp(self.phone)
         if self.email is not None:
             self.email = self.email.strip()
             if self.email == "":
@@ -38,33 +51,488 @@ class ManagementPrincipalOut(BaseModel):
     email: str | None = None
 
 
-@router.get("", response_model=ManagementPrincipalOut)
-def get_management_principal(
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_management),
-):
-    school_id = current_user["school_id"]
+class ManagementPrincipalRegisterOut(BaseModel):
+    status: str
+    principal: ManagementPrincipalOut
+    otp_status: str
+    delivery_channel: str | None = None
+    otp_error_code: str | None = None
+    message: str
 
-    principal = db.query(Principal).filter(
-        Principal.school_id == school_id).first()
-    if not principal:
-        raise HTTPException(status_code=404, detail="principal_not_found")
 
-    user = (
-        db.query(User)
-        .filter(User.school_id == school_id, User.id == principal.user_id)
-        .first()
+class ManagementPrincipalOtpRetryOut(BaseModel):
+    status: str
+    delivery_channel: str | None = None
+    otp_error_code: str | None = None
+    message: str
+
+
+class PrincipalHistoryOut(BaseModel):
+    id: int
+    name: str
+    phone: str
+    email: str | None = None
+    status: str
+    assigned_at: datetime
+    deactivated_at: datetime | None = None
+
+
+class PrincipalOnboardingStartOut(BaseModel):
+    status: str
+    session_id: int
+    phone_masked: str
+    expires_at: datetime
+    delivery_channel: str | None = None
+    message: str
+
+
+class PrincipalOnboardingResendIn(BaseModel):
+    school_id: int = Field(gt=0)
+    session_id: int = Field(gt=0)
+
+
+class PrincipalOnboardingVerifyIn(BaseModel):
+    school_id: int = Field(gt=0)
+    session_id: int = Field(gt=0)
+    otp: str = Field(min_length=4, max_length=8)
+
+
+class PrincipalOnboardingVerifyOut(BaseModel):
+    status: str
+    principal: ManagementPrincipalOut
+    deactivated_principals: list[PrincipalHistoryOut]
+    message: str
+
+
+OTP_TTL_MINUTES = settings.otp_ttl_minutes
+OTP_PEPPER = settings.otp_pepper
+
+
+def _hash_otp(phone: str, otp: str) -> str:
+    payload = f"{phone}:{otp}:{OTP_PEPPER}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _mask_phone(phone: str) -> str:
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if len(digits) < 4:
+        return phone
+    country = "+" if phone.startswith("+") else ""
+    return f"{country}*** *** {digits[-4:]}"
+
+
+def _resolve_management_school_id(
+    db: Session,
+    current_user: User,
+    requested_school_id: int | None = None,
+) -> int:
+    school_links = db.query(UserSchool).filter(UserSchool.user_id == current_user.id).all()
+    if not school_links:
+        raise HTTPException(status_code=403, detail="missing_school_context")
+
+    if requested_school_id is not None:
+        has_access = any(link.school_id == requested_school_id for link in school_links)
+        if not has_access:
+            raise HTTPException(status_code=403, detail="invalid_school_context")
+        return requested_school_id
+
+    management_link = next(
+        (link for link in school_links if str(link.role).upper() == "MANAGEMENT"),
+        None,
     )
-    # If this happens, DB is inconsistent. Treat as not found for safety.
-    if not user:
-        raise HTTPException(status_code=404, detail="principal_not_found")
+    if management_link:
+        return int(management_link.school_id)
+    return int(school_links[0].school_id)
 
+
+def _to_principal_out(principal: Principal, user: User) -> ManagementPrincipalOut:
     return ManagementPrincipalOut(
         principal_id=principal.id,
         user_id=user.id,
         name=principal.name,
-        phone=getattr(user, "phone", None),
+        phone=getattr(user, "phone", ""),
         email=getattr(user, "email", None),
+    )
+
+
+def _list_deactivated_principals(db: Session, school_id: int) -> list[PrincipalHistoryOut]:
+    rows = (
+        db.query(PrincipalAssignmentHistory)
+        .filter(
+            PrincipalAssignmentHistory.school_id == school_id,
+            PrincipalAssignmentHistory.status == "DEACTIVATED",
+        )
+        .order_by(PrincipalAssignmentHistory.deactivated_at.desc().nullslast())
+        .all()
+    )
+    return [
+        PrincipalHistoryOut(
+            id=row.id,
+            name=row.name,
+            phone=row.phone,
+            email=row.email,
+            status=row.status,
+            assigned_at=row.assigned_at,
+            deactivated_at=row.deactivated_at,
+        )
+        for row in rows
+    ]
+
+
+def _deactivate_active_history(db: Session, school_id: int, replaced_by_user_id: int) -> None:
+    now = datetime.now(timezone.utc)
+    active_rows = (
+        db.query(PrincipalAssignmentHistory)
+        .filter(
+            PrincipalAssignmentHistory.school_id == school_id,
+            PrincipalAssignmentHistory.status == "ACTIVE",
+        )
+        .all()
+    )
+    for row in active_rows:
+        row.status = "DEACTIVATED"
+        row.deactivated_at = now
+        row.replaced_by_user_id = replaced_by_user_id
+
+
+def _record_deactivated_snapshot(
+    db: Session,
+    school_id: int,
+    old_user: User,
+    old_principal_name: str,
+    replaced_by_user_id: int,
+) -> None:
+    db.add(
+        PrincipalAssignmentHistory(
+            school_id=school_id,
+            user_id=old_user.id,
+            replaced_by_user_id=replaced_by_user_id,
+            name=old_principal_name,
+            phone=getattr(old_user, "phone", ""),
+            email=getattr(old_user, "email", None),
+            status="DEACTIVATED",
+            deactivated_at=datetime.now(timezone.utc),
+        )
+    )
+
+
+def _record_active_snapshot(db: Session, school_id: int, principal: Principal, user: User) -> None:
+    db.add(
+        PrincipalAssignmentHistory(
+            school_id=school_id,
+            user_id=user.id,
+            name=principal.name,
+            phone=getattr(user, "phone", ""),
+            email=getattr(user, "email", None),
+            status="ACTIVE",
+        )
+    )
+
+
+def _upsert_management_principal_internal(
+    payload: ManagementPrincipalIn,
+    response: Response,
+    db: Session,
+    current_user: User,
+) -> ManagementPrincipalOut:
+    school_id = _resolve_management_school_id(db, current_user, payload.school_id)
+    normalized_phone = normalize_phone_for_otp(payload.phone)
+
+    existing_principal = db.query(Principal).filter(Principal.school_id == school_id).first()
+
+    existing_user = (
+        db.query(User)
+        .filter(User.phone.in_(phone_candidates(normalized_phone)))
+        .first()
+    )
+
+    def _deactivate_user_if_supported(user_obj: User) -> None:
+        if hasattr(user_obj, "is_active"):
+            setattr(user_obj, "is_active", False)
+
+    if existing_user:
+        existing_access = (
+            db.query(UserSchool)
+            .filter(
+                UserSchool.user_id == existing_user.id,
+                UserSchool.school_id == school_id,
+            )
+            .first()
+        )
+        if not existing_access:
+            db.add(UserSchool(user_id=existing_user.id, school_id=school_id, role="principal"))
+
+        existing_user.role = "PRINCIPAL"
+        if hasattr(existing_user, "is_active"):
+            existing_user.is_active = True
+        existing_user.phone = normalized_phone
+        if payload.email is not None:
+            existing_user.email = payload.email
+
+        if existing_principal and existing_principal.user_id == existing_user.id:
+            response.status_code = status.HTTP_200_OK
+            existing_principal.name = payload.name
+            db.commit()
+            db.refresh(existing_principal)
+            return _to_principal_out(existing_principal, existing_user)
+
+        if existing_principal:
+            old_user = db.query(User).filter(User.id == existing_principal.user_id).first()
+            if old_user and old_user.id != existing_user.id:
+                _deactivate_user_if_supported(old_user)
+                _deactivate_active_history(db, school_id, existing_user.id)
+                _record_deactivated_snapshot(
+                    db,
+                    school_id,
+                    old_user,
+                    existing_principal.name,
+                    existing_user.id,
+                )
+
+            existing_principal.user_id = existing_user.id
+            existing_principal.name = payload.name
+            _record_active_snapshot(db, school_id, existing_principal, existing_user)
+            db.commit()
+            db.refresh(existing_principal)
+            return _to_principal_out(existing_principal, existing_user)
+
+        principal = Principal(school_id=school_id, user_id=existing_user.id, name=payload.name)
+        db.add(principal)
+        db.flush()
+        _record_active_snapshot(db, school_id, principal, existing_user)
+        db.commit()
+        db.refresh(principal)
+        return _to_principal_out(principal, existing_user)
+
+    user = User(
+        phone=normalized_phone,
+        role="PRINCIPAL",
+        is_active=True,
+        email=payload.email,
+    )
+    db.add(user)
+    db.flush()
+    db.add(UserSchool(user_id=user.id, school_id=school_id, role="principal"))
+
+    if existing_principal:
+        old_user = db.query(User).filter(User.id == existing_principal.user_id).first()
+        if old_user and old_user.id != user.id:
+            _deactivate_user_if_supported(old_user)
+            _deactivate_active_history(db, school_id, user.id)
+            _record_deactivated_snapshot(
+                db,
+                school_id,
+                old_user,
+                existing_principal.name,
+                user.id,
+            )
+
+        existing_principal.user_id = user.id
+        existing_principal.name = payload.name
+        _record_active_snapshot(db, school_id, existing_principal, user)
+        db.commit()
+        db.refresh(existing_principal)
+        return _to_principal_out(existing_principal, user)
+
+    principal = Principal(school_id=school_id, user_id=user.id, name=payload.name)
+    db.add(principal)
+    db.flush()
+    _record_active_snapshot(db, school_id, principal, user)
+    db.commit()
+    db.refresh(principal)
+    return _to_principal_out(principal, user)
+
+
+def _consume_valid_otp(db: Session, phone: str, otp: str) -> None:
+    now = datetime.now(timezone.utc)
+    normalized_phone = normalize_phone_for_otp(phone)
+
+    otp_row = (
+        db.query(OtpRequest)
+        .filter(
+            OtpRequest.phone == normalized_phone,
+            OtpRequest.consumed_at.is_(None),
+            OtpRequest.expires_at > now,
+        )
+        .order_by(OtpRequest.id.desc())
+        .first()
+    )
+
+    if not otp_row:
+        latest_any = (
+            db.query(OtpRequest)
+            .filter(
+                OtpRequest.phone == normalized_phone,
+                OtpRequest.consumed_at.is_(None),
+            )
+            .order_by(OtpRequest.id.desc())
+            .first()
+        )
+        if latest_any and latest_any.expires_at <= now:
+            raise HTTPException(status_code=400, detail="otp_expired")
+        raise HTTPException(status_code=400, detail="otp_not_found")
+
+    provided_hash = _hash_otp(normalized_phone, otp)
+    if not hmac.compare_digest(otp_row.otp_hash, provided_hash):
+        otp_row.attempt_count = (otp_row.attempt_count or 0) + 1
+        db.add(otp_row)
+        db.commit()
+        raise HTTPException(status_code=400, detail="otp_invalid")
+
+    otp_row.consumed_at = now
+    db.add(otp_row)
+    db.commit()
+
+
+@router.get("", response_model=ManagementPrincipalOut)
+def get_management_principal(
+    school_id: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+):
+    school_id = _resolve_management_school_id(db, current_user, school_id)
+
+    principal = db.query(Principal).filter(Principal.school_id == school_id).first()
+    if not principal:
+        raise HTTPException(status_code=404, detail="principal_not_found")
+
+    user = db.query(User).filter(User.id == principal.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="principal_not_found")
+
+    return _to_principal_out(principal, user)
+
+
+@router.get("/history", response_model=list[PrincipalHistoryOut])
+def list_principal_history(
+    school_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+):
+    school_id = _resolve_management_school_id(db, current_user, school_id)
+    return _list_deactivated_principals(db, school_id)
+
+
+@router.post("/onboarding/start", response_model=PrincipalOnboardingStartOut, status_code=200)
+def start_principal_onboarding(
+    payload: ManagementPrincipalIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+):
+    school_id = _resolve_management_school_id(db, current_user, payload.school_id)
+
+    otp_result = request_otp(OtpRequestIn(phone=payload.phone), request, db)
+
+    session = PrincipalOnboardingSession(
+        school_id=school_id,
+        requested_by_user_id=current_user.id,
+        name=payload.name,
+        phone=normalize_phone_for_otp(payload.phone),
+        email=payload.email,
+        status="PENDING",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES),
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return PrincipalOnboardingStartOut(
+        status="otp_sent",
+        session_id=session.id,
+        phone_masked=_mask_phone(session.phone),
+        expires_at=session.expires_at,
+        delivery_channel=otp_result.get("delivery_channel"),
+        message="OTP sent. Verify to complete principal assignment.",
+    )
+
+
+@router.post("/onboarding/resend", response_model=PrincipalOnboardingStartOut, status_code=200)
+def resend_principal_onboarding_otp(
+    payload: PrincipalOnboardingResendIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+):
+    school_id = _resolve_management_school_id(db, current_user, payload.school_id)
+    session = (
+        db.query(PrincipalOnboardingSession)
+        .filter(
+            PrincipalOnboardingSession.id == payload.session_id,
+            PrincipalOnboardingSession.school_id == school_id,
+        )
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="onboarding_session_not_found")
+    if session.status != "PENDING":
+        raise HTTPException(status_code=409, detail="onboarding_session_not_pending")
+
+    otp_result = request_otp(OtpRequestIn(phone=session.phone), request, db)
+    session.expires_at = datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES)
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    return PrincipalOnboardingStartOut(
+        status="otp_sent",
+        session_id=session.id,
+        phone_masked=_mask_phone(session.phone),
+        expires_at=session.expires_at,
+        delivery_channel=otp_result.get("delivery_channel"),
+        message="OTP resent. Verify to complete principal assignment.",
+    )
+
+
+@router.post("/onboarding/verify", response_model=PrincipalOnboardingVerifyOut, status_code=200)
+def verify_principal_onboarding(
+    payload: PrincipalOnboardingVerifyIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+):
+    school_id = _resolve_management_school_id(db, current_user, payload.school_id)
+    session = (
+        db.query(PrincipalOnboardingSession)
+        .filter(
+            PrincipalOnboardingSession.id == payload.session_id,
+            PrincipalOnboardingSession.school_id == school_id,
+        )
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="onboarding_session_not_found")
+    if session.status != "PENDING":
+        raise HTTPException(status_code=409, detail="onboarding_session_not_pending")
+    if session.expires_at <= datetime.now(timezone.utc):
+        session.status = "EXPIRED"
+        db.add(session)
+        db.commit()
+        raise HTTPException(status_code=400, detail="onboarding_session_expired")
+
+    _consume_valid_otp(db, session.phone, payload.otp.strip())
+
+    principal = _upsert_management_principal_internal(
+        payload=ManagementPrincipalIn(
+            school_id=school_id,
+            name=session.name,
+            phone=session.phone,
+            email=session.email,
+        ),
+        response=Response(),
+        db=db,
+        current_user=current_user,
+    )
+
+    session.status = "VERIFIED"
+    session.verified_at = datetime.now(timezone.utc)
+    db.add(session)
+    db.commit()
+
+    return PrincipalOnboardingVerifyOut(
+        status="success",
+        principal=principal,
+        deactivated_principals=_list_deactivated_principals(db, school_id),
+        message="Principal verified and assigned successfully.",
     )
 
 
@@ -73,135 +541,70 @@ def upsert_management_principal(
     payload: ManagementPrincipalIn,
     response: Response,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(require_management),
+    current_user: User = Depends(require_management),
 ):
-    school_id = current_user["school_id"]
+    return _upsert_management_principal_internal(payload, response, db, current_user)
 
-    # 1) Find existing user by phone (tenant-scoped)
-    existing_user = (
-        db.query(User)
-        .filter(User.school_id == school_id, User.phone == payload.phone)
-        .first()
-    )
 
-    # 2) Find existing principal row (one per school)
-    existing_principal = db.query(Principal).filter(
-        Principal.school_id == school_id).first()
+@router.post("/register", response_model=ManagementPrincipalRegisterOut, status_code=200)
+def register_management_principal_with_otp(
+    payload: ManagementPrincipalIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+):
+    upsert_response = Response()
+    principal = _upsert_management_principal_internal(payload, upsert_response, db, current_user)
 
-    # Helper: safely deactivate previous principal user if column exists
-    def _deactivate_user_if_supported(user_obj: User) -> None:
-        if hasattr(user_obj, "is_active"):
-            setattr(user_obj, "is_active", False)
-
-    # CASE A: user exists
-    if existing_user:
-        # Ensure role becomes PRINCIPAL (force)
-        if hasattr(existing_user, "role"):
-            setattr(existing_user, "role", "PRINCIPAL")
-        if hasattr(existing_user, "is_active"):
-            setattr(existing_user, "is_active", True)
-        if payload.email is not None and hasattr(existing_user, "email"):
-            setattr(existing_user, "email", payload.email)
-
-        # A1) If principal exists and already points to this user -> idempotent 200
-        if existing_principal and existing_principal.user_id == existing_user.id:
-            response.status_code = status.HTTP_200_OK
-            # Keep name up to date if they resend (pilot-safe)
-            existing_principal.name = payload.name
-            db.commit()
-            db.refresh(existing_principal)
-            return ManagementPrincipalOut(
-                principal_id=existing_principal.id,
-                user_id=existing_user.id,
-                name=existing_principal.name,
-                phone=getattr(existing_user, "phone", None),
-                email=getattr(existing_user, "email", None),
-            )
-
-        # A2) Replacement or first principal row
-        if existing_principal:
-            # deactivate old principal user (if supported)
-            old_user = (
-                db.query(User)
-                .filter(User.school_id == school_id, User.id == existing_principal.user_id)
-                .first()
-            )
-            if old_user and old_user.id != existing_user.id:
-                _deactivate_user_if_supported(old_user)
-
-            existing_principal.user_id = existing_user.id
-            existing_principal.name = payload.name
-            db.commit()
-            db.refresh(existing_principal)
-            return ManagementPrincipalOut(
-                principal_id=existing_principal.id,
-                user_id=existing_user.id,
-                name=existing_principal.name,
-                phone=getattr(existing_user, "phone", None),
-                email=getattr(existing_user, "email", None),
-            )
-
-        # No principal row yet -> create it (201)
-        principal = Principal(school_id=school_id,
-                              user_id=existing_user.id, name=payload.name)
-        db.add(principal)
-        db.commit()
-        db.refresh(principal)
-        return ManagementPrincipalOut(
-            principal_id=principal.id,
-            user_id=existing_user.id,
-            name=principal.name,
-            phone=getattr(existing_user, "phone", None),
-            email=getattr(existing_user, "email", None),
+    try:
+        otp_result = request_otp(OtpRequestIn(phone=principal.phone), request, db)
+        return ManagementPrincipalRegisterOut(
+            status="success",
+            principal=principal,
+            otp_status="sent",
+            delivery_channel=otp_result.get("delivery_channel"),
+            message="Principal registered successfully and OTP sent.",
+        )
+    except HTTPException as exc:
+        logger.warning(
+            "principal register otp failed school_id=%s principal_id=%s error=%s",
+            payload.school_id,
+            principal.principal_id,
+            exc.detail,
+        )
+        return ManagementPrincipalRegisterOut(
+            status="partial_success",
+            principal=principal,
+            otp_status="failed",
+            otp_error_code=str(exc.detail),
+            message="Principal registered, but OTP delivery failed. You can retry.",
         )
 
-    # CASE B: user does NOT exist -> create user + principal (replace if exists)
-    user_kwargs = {
-        "school_id": school_id,
-        "phone": payload.phone,
-        "role": "PRINCIPAL",
-    }
-    if hasattr(User, "is_active"):
-        user_kwargs["is_active"] = True
-    if payload.email is not None and hasattr(User, "email"):
-        user_kwargs["email"] = payload.email
 
-    user = User(**user_kwargs)
-    db.add(user)
-    db.flush()  # user.id now available
-
-    if existing_principal:
-        # deactivate old principal user (if supported)
-        old_user = (
-            db.query(User)
-            .filter(User.school_id == school_id, User.id == existing_principal.user_id)
-            .first()
+@router.post("/retry-otp", response_model=ManagementPrincipalOtpRetryOut, status_code=200)
+def retry_principal_otp(
+    request: Request,
+    school_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+):
+    principal = get_management_principal(school_id=school_id, db=db, current_user=current_user)
+    try:
+        otp_result = request_otp(OtpRequestIn(phone=principal.phone), request, db)
+        return ManagementPrincipalOtpRetryOut(
+            status="success",
+            delivery_channel=otp_result.get("delivery_channel"),
+            message="OTP resent successfully to principal phone.",
         )
-        if old_user:
-            _deactivate_user_if_supported(old_user)
-
-        existing_principal.user_id = user.id
-        existing_principal.name = payload.name
-        db.commit()
-        db.refresh(existing_principal)
-        return ManagementPrincipalOut(
-            principal_id=existing_principal.id,
-            user_id=user.id,
-            name=existing_principal.name,
-            phone=getattr(user, "phone", None),
-            email=getattr(user, "email", None),
+    except HTTPException as exc:
+        logger.warning(
+            "principal retry otp failed school_id=%s principal_id=%s error=%s",
+            school_id,
+            principal.principal_id,
+            exc.detail,
         )
-
-    principal = Principal(school_id=school_id,
-                          user_id=user.id, name=payload.name)
-    db.add(principal)
-    db.commit()
-    db.refresh(principal)
-
-    return ManagementPrincipalOut(
-        principal_id=principal.id,
-        user_id=user.id,
-        name=principal.name,
-        phone=getattr(user, "phone", None),
-        email=getattr(user, "email", None),
-    )
+        return ManagementPrincipalOtpRetryOut(
+            status="failed",
+            otp_error_code=str(exc.detail),
+            message="Unable to resend OTP right now. Please try again shortly.",
+        )
