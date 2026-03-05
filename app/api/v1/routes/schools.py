@@ -20,6 +20,7 @@ router = APIRouter(prefix="/schools", tags=["schools"])
 class SchoolCreate(BaseModel):
     name: str
     admin_phone: str
+    admin_email: str | None = None
 
 
 class SchoolOut(BaseModel):
@@ -270,6 +271,7 @@ def create_school(
             # Create a new user if they don't exist
             admin_user = User(
                 phone=payload.admin_phone,
+                email=payload.admin_email,
                 role="management",
                 is_active=True
             )
@@ -277,6 +279,9 @@ def create_school(
             db.flush()  # Get the admin_user.id
         else:
             admin_user = existing_user
+            if payload.admin_email and not admin_user.email:
+                admin_user.email = payload.admin_email
+                db.add(admin_user)
 
         # 2. Link this user to the school in the mapping table
         # This allows one phone number to access multiple schools
