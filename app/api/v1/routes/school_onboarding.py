@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_current_user, get_db
 from app.core.phone import normalize_phone
+from app.core.roles import normalize_role
 from app.db.models.user import User
 from app.services.school_onboarding import (
     OnboardingConflict,
@@ -27,7 +28,7 @@ PIN_RE = re.compile(r"^\d{6}$")
 
 
 def _ensure_can_onboard(current_user: User) -> None:
-    if current_user.role == "super_admin":
+    if normalize_role(current_user.role) == "SUPER_ADMIN":
         return
     if not current_user.can_create_school:
         raise HTTPException(

@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.db.models.user_school import UserSchool
 from app.integrations.email.brevo import send_otp_email
 from app.integrations.whatsapp.client import send_otp_template
+from app.core.roles import normalize_role
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -437,7 +438,7 @@ def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)):
         # The frontend will now call a separate /me or /user/schools
         # endpoint to see which schools this user can access.
         "role": user.role,
-        "is_super_admin": user.role == "super_admin",
+        "is_super_admin": normalize_role(user.role) == "SUPER_ADMIN",
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
     }

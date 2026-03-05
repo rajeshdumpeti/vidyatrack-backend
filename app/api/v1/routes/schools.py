@@ -12,6 +12,7 @@ from app.db.models.student import Student
 from app.db.models.teacher import Teacher
 from app.db.models.user import User  # Import User model to create the admin
 from app.db.models.user_school import UserSchool
+from app.core.roles import normalize_role
 
 router = APIRouter(prefix="/schools", tags=["schools"])
 
@@ -248,7 +249,7 @@ def create_school(
     current_user: User = Depends(get_current_user),
 ):
     # Only you (super_admin) should be able to create new schools
-    if current_user.role != "super_admin":
+    if normalize_role(current_user.role) != "SUPER_ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only Super Admins can onboard new schools",

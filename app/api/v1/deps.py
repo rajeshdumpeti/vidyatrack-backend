@@ -9,6 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.roles import normalize_role
 from app.db.session import SessionLocal
 from app.db.models.user import User
 from app.db.models.user_school import UserSchool
@@ -86,7 +87,7 @@ def get_current_user(
 
 
 def require_management(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role.upper() != "MANAGEMENT":
+    if normalize_role(current_user.role) != "MANAGEMENT":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="insufficient_permissions",
@@ -95,7 +96,7 @@ def require_management(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_teacher(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role.upper() != "TEACHER":
+    if normalize_role(current_user.role) != "TEACHER":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="insufficient_permissions",
@@ -104,7 +105,7 @@ def require_teacher(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_principal(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role.upper() != "PRINCIPAL":
+    if normalize_role(current_user.role) != "PRINCIPAL":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="insufficient_permissions",
@@ -113,7 +114,7 @@ def require_principal(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role.upper() != "SUPER_ADMIN":
+    if normalize_role(current_user.role) != "SUPER_ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="insufficient_permissions",
@@ -124,7 +125,7 @@ def require_super_admin(current_user: User = Depends(get_current_user)) -> User:
 def require_teacher_or_management_or_principal(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    if current_user.role.upper() not in ["TEACHER", "MANAGEMENT", "PRINCIPAL"]:
+    if normalize_role(current_user.role) not in ["TEACHER", "MANAGEMENT", "PRINCIPAL"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="insufficient_permissions",

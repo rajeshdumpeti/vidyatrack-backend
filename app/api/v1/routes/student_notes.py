@@ -18,6 +18,7 @@ from app.db.models.section_subject_teacher import SectionSubjectTeacher
 from app.db.models.section import Section
 from app.db.models.class_ import Class
 from app.db.models.subject import Subject
+from app.core.roles import normalize_role
 
 router = APIRouter(prefix="/students", tags=["student-notes"])
 
@@ -58,8 +59,8 @@ def _resolve_author_meta(
         return {}
     users = db.query(User).filter(User.id.in_(user_ids)).all()
     users_by_id = {u.id: u for u in users}
-    teacher_user_ids = [u.id for u in users if u.role == "TEACHER"]
-    principal_user_ids = [u.id for u in users if u.role == "PRINCIPAL"]
+    teacher_user_ids = [u.id for u in users if normalize_role(u.role) == "TEACHER"]
+    principal_user_ids = [u.id for u in users if normalize_role(u.role) == "PRINCIPAL"]
 
     teachers_by_user = {}
     if teacher_user_ids:
@@ -119,7 +120,7 @@ def _resolve_author_meta(
 
     meta = {}
     for user_id, user in users_by_id.items():
-        role = user.role
+        role = normalize_role(user.role)
         name = "Management"
         class_name = None
         section_name = None
