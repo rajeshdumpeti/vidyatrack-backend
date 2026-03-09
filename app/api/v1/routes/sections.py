@@ -8,6 +8,7 @@ from app.api.v1.deps import get_db, get_current_user
 from app.db.models.class_ import Class
 from app.db.models.section import Section
 from app.db.models.user import User
+from app.services.public_id import get_tenant_code_for_school, next_public_id
 
 router = APIRouter(prefix="/sections", tags=["sections"])
 
@@ -20,6 +21,7 @@ class SectionCreate(BaseModel):
 
 class SectionOut(BaseModel):
     id: int
+    public_id: str
     school_id: int
     class_id: int
     name: str
@@ -83,6 +85,11 @@ def create_section(
         name=payload.name,
         class_id=payload.class_id,
         school_id=school_id,
+        public_id=next_public_id(
+            db,
+            tenant_code=get_tenant_code_for_school(db, school_id),
+            entity="section",
+        ),
     )
     db.add(row)
     db.commit()

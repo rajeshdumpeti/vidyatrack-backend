@@ -28,6 +28,8 @@ router = APIRouter(prefix="/students", tags=["student-notes"])
 class StudentNoteCreate(BaseModel):
     # Note: Only include note_text here. school_id comes from Query params.
     note_text: str
+    section_id: int | None = None
+    subject_id: int | None = None
     model_config = ConfigDict(extra="forbid")
 
 
@@ -35,6 +37,9 @@ class StudentNoteOut(BaseModel):
     id: int
     school_id: int
     student_id: int
+    student_name: str | None = None
+    section_id: int | None = None
+    subject_id: int | None = None
     author_user_id: int | None
     author_name: str | None = None
     author_role: str | None = None
@@ -146,12 +151,45 @@ def _resolve_author_meta(
         }
     return meta
 
+
+def _resolve_student_by_ref(db: Session, school_id: int, student_ref: str) -> Student | None:
+    if student_ref.isdigit():
+        return (
+            db.query(Student)
+            .filter(Student.id == int(student_ref), Student.school_id == school_id)
+            .first()
+        )
+    return (
+        db.query(Student)
+        .filter(Student.public_id == student_ref, Student.school_id == school_id)
+        .first()
+    )
+
+
+def _resolve_student_section_meta(
+    db: Session,
+    school_id: int,
+    section_id: int | None,
+):
+    if section_id is None:
+        return None, None
+    row = (
+        db.query(Section, Class)
+        .join(Class, Class.id == Section.class_id)
+        .filter(Section.id == section_id, Section.school_id == school_id)
+        .first()
+    )
+    if not row:
+        return None, None
+    sec, cls = row
+    return cls.name, sec.name
+
 # --- ROUTES ---
 
 
 @router.post("/{student_id}/notes", response_model=StudentNoteOut, status_code=201)
 def create_student_note(
-    student_id: int,
+    student_id: str,
     payload: StudentNoteCreate,
     db: Session = Depends(get_db),
     # Returns User object: access via current_user.id
@@ -162,17 +200,35 @@ def create_student_note(
     if not payload.note_text.strip():
         raise HTTPException(status_code=422, detail="note_text_required")
 
-    student = db.query(Student).filter(
-        Student.id == student_id,
-        Student.school_id == school_id
-    ).first()
+    student = _resolve_student_by_ref(db, school_id, student_id)
 
     if not student:
         raise HTTPException(status_code=400, detail="invalid_student_id")
 
+    section_id = payload.section_id
+    subject_id = payload.subject_id
+    if section_id is not None:
+        sec = (
+            db.query(Section.id)
+            .filter(Section.school_id == school_id, Section.id == section_id)
+            .first()
+        )
+        if not sec:
+            raise HTTPException(status_code=400, detail="invalid_section_id")
+    if subject_id is not None:
+        subj = (
+            db.query(Subject.id)
+            .filter(Subject.school_id == school_id, Subject.id == subject_id)
+            .first()
+        )
+        if not subj:
+            raise HTTPException(status_code=400, detail="invalid_subject_id")
+
     note = StudentNote(
         school_id=school_id,
-        student_id=student_id,
+        student_id=student.id,
+        section_id=section_id,
+        subject_id=subject_id,
         author_user_id=current_user.id,  # FIXED: dot notation, not brackets
         note_text=payload.note_text,
     )
@@ -184,17 +240,41 @@ def create_student_note(
         db, school_id, {current_user.id}, student.section_id
     )
     author = meta.get(current_user.id, {})
+    class_name = author.get("class_name")
+    section_name = author.get("section_name")
+    subject_name = author.get("subject_name")
+    if note.section_id:
+        class_name, section_name = _resolve_student_section_meta(
+            db, school_id, note.section_id
+        )
+    else:
+        fallback_class, fallback_section = _resolve_student_section_meta(
+            db, school_id, student.section_id
+        )
+        class_name = class_name or fallback_class
+        section_name = section_name or fallback_section
+    if note.subject_id:
+        sub_row = (
+            db.query(Subject.name)
+            .filter(Subject.id == note.subject_id, Subject.school_id == school_id)
+            .first()
+        )
+        if sub_row:
+            subject_name = sub_row[0]
 
     return StudentNoteOut(
         id=note.id,
         school_id=note.school_id,
         student_id=note.student_id,
+        student_name=student.name,
+        section_id=note.section_id,
+        subject_id=note.subject_id,
         author_user_id=note.author_user_id,
         author_name=author.get("name"),
         author_role=author.get("role"),
-        class_name=author.get("class_name"),
-        section_name=author.get("section_name"),
-        subject_name=author.get("subject_name"),
+        class_name=class_name,
+        section_name=section_name,
+        subject_name=subject_name,
         note_text=note.note_text,
         created_at=note.created_at,
     )
@@ -202,39 +282,73 @@ def create_student_note(
 
 @router.get("/{student_id}/notes", response_model=list[StudentNoteOut])
 def list_student_notes(
-    student_id: int,
+    student_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_teacher_or_management_or_principal),
     school_id: int = Depends(get_valid_school_id),
 ):
-    student = db.query(Student).filter(
-        Student.id == student_id,
-        Student.school_id == school_id
-    ).first()
+    student = _resolve_student_by_ref(db, school_id, student_id)
 
     if not student:
         raise HTTPException(status_code=400, detail="invalid_student_id")
 
     notes = db.query(StudentNote).filter(
         StudentNote.school_id == school_id,
-        StudentNote.student_id == student_id,
+        StudentNote.student_id == student.id,
     ).order_by(StudentNote.created_at.desc()).all()
 
     author_ids = {n.author_user_id for n in notes if n.author_user_id}
     meta = _resolve_author_meta(db, school_id, author_ids, student.section_id)
+
+    section_ids = {n.section_id for n in notes if n.section_id}
+    if student.section_id:
+        section_ids.add(student.section_id)
+    subject_ids = {n.subject_id for n in notes if n.subject_id}
+    sections_by_id = {}
+    subjects_by_id = {}
+    if section_ids:
+        section_rows = (
+            db.query(Section, Class)
+            .join(Class, Class.id == Section.class_id)
+            .filter(Section.id.in_(section_ids), Section.school_id == school_id)
+            .all()
+        )
+        sections_by_id = {
+            sec.id: {"section": sec.name, "class": cls.name}
+            for sec, cls in section_rows
+        }
+    if subject_ids:
+        subject_rows = (
+            db.query(Subject.id, Subject.name)
+            .filter(Subject.id.in_(subject_ids), Subject.school_id == school_id)
+            .all()
+        )
+        subjects_by_id = {sid: name for sid, name in subject_rows}
 
     return [
         StudentNoteOut(
             id=n.id,
             school_id=n.school_id,
             student_id=n.student_id,
+            student_name=student.name,
+            section_id=n.section_id,
+            subject_id=n.subject_id,
             author_user_id=n.author_user_id,
             author_name=meta.get(n.author_user_id, {}).get("name"),
             author_role=meta.get(n.author_user_id, {}).get("role"),
-            class_name=meta.get(n.author_user_id, {}).get("class_name"),
-            section_name=meta.get(n.author_user_id, {}).get("section_name"),
-            subject_name=meta.get(n.author_user_id, {}).get("subject_name"),
+            class_name=sections_by_id.get(n.section_id, {}).get("class")
+            if n.section_id
+            else sections_by_id.get(student.section_id, {}).get("class")
+            or meta.get(n.author_user_id, {}).get("class_name"),
+            section_name=sections_by_id.get(n.section_id, {}).get("section")
+            if n.section_id
+            else sections_by_id.get(student.section_id, {}).get("section")
+            or meta.get(n.author_user_id, {}).get("section_name"),
+            subject_name=subjects_by_id.get(n.subject_id)
+            if n.subject_id
+            else meta.get(n.author_user_id, {}).get("subject_name"),
             note_text=n.note_text,
             created_at=n.created_at,
-        ) for n in notes
+        )
+        for n in notes
     ]

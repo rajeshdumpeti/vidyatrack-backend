@@ -14,6 +14,7 @@ from app.db.models.teacher_primary_section import TeacherPrimarySection
 from app.db.models.section import Section
 from app.db.models.user import User
 from app.db.models.user_school import UserSchool
+from app.services.public_id import get_tenant_code_for_school, next_public_id
 
 router_mgmt = APIRouter(prefix="/management/teachers",
                         tags=["management-teachers"])
@@ -47,6 +48,7 @@ class ManagementCreateTeacherIn(BaseModel):
 class ManagementCreateTeacherOut(BaseModel):
     user_id: int
     teacher_id: int
+    teacher_public_id: str
     name: str
     email: str | None = None
     phone: str | None = None
@@ -123,6 +125,7 @@ def management_create_teacher(
             return ManagementCreateTeacherOut(
                 user_id=existing_user.id,
                 teacher_id=teacher.id,
+                teacher_public_id=teacher.public_id,
                 name=teacher.name,
                 email=existing_user.email,
                 phone=existing_user.phone,
@@ -149,6 +152,11 @@ def management_create_teacher(
             school_id=sid,
             user_id=existing_user.id,
             name=payload.name,
+            public_id=next_public_id(
+                db,
+                tenant_code=get_tenant_code_for_school(db, sid),
+                entity="teacher",
+            ),
         )
         db.add(teacher)
         db.flush()
@@ -167,6 +175,7 @@ def management_create_teacher(
     return ManagementCreateTeacherOut(
         user_id=existing_user.id,
         teacher_id=teacher.id,
+        teacher_public_id=teacher.public_id,
         name=teacher.name,
         email=existing_user.email,
         phone=existing_user.phone,

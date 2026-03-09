@@ -12,6 +12,7 @@ from app.db.models.student import Student
 from app.db.models.teacher import Teacher
 from app.db.models.user import User  # Import User model to create the admin
 from app.db.models.user_school import UserSchool
+from app.services.public_id import ensure_unique_tenant_code, next_public_id, derive_tenant_code
 from app.core.roles import normalize_role
 
 router = APIRouter(prefix="/schools", tags=["schools"])
@@ -19,12 +20,14 @@ router = APIRouter(prefix="/schools", tags=["schools"])
 
 class SchoolCreate(BaseModel):
     name: str
+    school_code: str | None = None
     admin_phone: str
     admin_email: str | None = None
 
 
 class SchoolOut(BaseModel):
     id: int
+    public_id: str
     name: str
     code: str | None = None
     board: str | None = None
@@ -48,6 +51,7 @@ class SchoolOut(BaseModel):
 
 class SchoolDashboardOut(BaseModel):
     school_id: int
+    school_public_id: str | None = None
     teacher_count: int
     student_count: int
     staff_count: int
@@ -120,7 +124,7 @@ def get_school_dashboard(
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_super_admin),
 ):
-    _get_school_or_404(db, school_id)
+    school = _get_school_or_404(db, school_id)
 
     teacher_count = (
         db.query(func.count(Teacher.id))
@@ -146,6 +150,7 @@ def get_school_dashboard(
 
     return SchoolDashboardOut(
         school_id=school_id,
+        school_public_id=school.public_id,
         teacher_count=teacher_count,
         student_count=student_count,
         staff_count=staff_count,
@@ -258,12 +263,23 @@ def create_school(
 
     try:
         # 1. Create the School
-        new_school = School(name=payload.name)
+        tenant_code = ensure_unique_tenant_code(
+            db, derive_tenant_code(payload.name)
+        )
+        new_school = School(
+            name=payload.name,
+            code=tenant_code,
+            public_id=next_public_id(
+                db,
+                tenant_code=tenant_code,
+                entity="school",
+            ),
+        )
         db.add(new_school)
         db.flush()  # This gets us the new_school.id without committing yet
 
         # 2. Create the Management Admin for this school
-      # 1. Check if the user already exists
+        # 1. Check if the user already exists
         existing_user = db.query(User).filter(
             User.phone == payload.admin_phone).first()
 

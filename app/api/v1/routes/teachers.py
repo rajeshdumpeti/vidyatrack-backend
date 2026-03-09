@@ -13,6 +13,7 @@ from app.db.models.class_ import Class
 from app.db.models.subject import Subject
 from app.db.models.teacher_primary_section import TeacherPrimarySection
 from app.db.models.user_school import UserSchool
+from app.services.public_id import get_tenant_code_for_school, next_public_id
 
 router = APIRouter(prefix="/teachers", tags=["teachers"])
 
@@ -30,6 +31,7 @@ class TeacherCreate(BaseModel):
 
 class TeacherOut(BaseModel):
     id: int
+    public_id: str
     school_id: int
     user_id: Optional[int] = None
     name: str
@@ -111,6 +113,7 @@ def list_teachers(
     return [
         TeacherOut(
             id=teacher.id,
+            public_id=teacher.public_id,
             school_id=teacher.school_id,
             user_id=teacher.user_id,
             name=teacher.name,
@@ -125,7 +128,7 @@ def list_teachers(
             phone=users_by_id.get(teacher.user_id).phone
             if teacher.user_id in users_by_id
             else None,
-            employee_id=f"T-{teacher.id:04d}",
+            employee_id=teacher.public_id,
             status=(
                 "active"
                 if (
@@ -161,6 +164,10 @@ def create_teacher(
         )
         db.add(user)
         db.flush()
+    elif payload.email is not None and payload.email.strip():
+        if user.email != payload.email.strip():
+            user.email = payload.email.strip()
+            db.add(user)
 
     # 2. Resolve Teacher record
     teacher = db.query(Teacher).filter(
@@ -173,7 +180,12 @@ def create_teacher(
             school_id=sid,
             user_id=user.id,
             name=payload.name,
-            email=payload.email
+            email=payload.email,
+            public_id=next_public_id(
+                db,
+                tenant_code=get_tenant_code_for_school(db, sid),
+                entity="teacher",
+            ),
         )
         db.add(teacher)
         db.flush()

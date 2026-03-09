@@ -19,6 +19,7 @@ from app.db.models.principal_assignment_history import PrincipalAssignmentHistor
 from app.db.models.principal_onboarding_session import PrincipalOnboardingSession
 from app.db.models.user import User
 from app.db.models.user_school import UserSchool
+from app.services.public_id import get_tenant_code_for_school, next_public_id
 
 router = APIRouter(prefix="/management/principal", tags=["management-principal"])
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ class ManagementPrincipalIn(BaseModel):
 
 class ManagementPrincipalOut(BaseModel):
     principal_id: int
+    principal_public_id: str
     user_id: int
     name: str
     phone: str
@@ -148,6 +150,7 @@ def _resolve_management_school_id(
 def _to_principal_out(principal: Principal, user: User) -> ManagementPrincipalOut:
     return ManagementPrincipalOut(
         principal_id=principal.id,
+        principal_public_id=principal.public_id,
         user_id=user.id,
         name=principal.name,
         phone=getattr(user, "phone", ""),
@@ -296,7 +299,16 @@ def _upsert_management_principal_internal(
             db.refresh(existing_principal)
             return _to_principal_out(existing_principal, existing_user)
 
-        principal = Principal(school_id=school_id, user_id=existing_user.id, name=payload.name)
+        principal = Principal(
+            school_id=school_id,
+            user_id=existing_user.id,
+            name=payload.name,
+            public_id=next_public_id(
+                db,
+                tenant_code=get_tenant_code_for_school(db, school_id),
+                entity="principal",
+            ),
+        )
         db.add(principal)
         db.flush()
         _record_active_snapshot(db, school_id, principal, existing_user)
@@ -334,7 +346,16 @@ def _upsert_management_principal_internal(
         db.refresh(existing_principal)
         return _to_principal_out(existing_principal, user)
 
-    principal = Principal(school_id=school_id, user_id=user.id, name=payload.name)
+    principal = Principal(
+        school_id=school_id,
+        user_id=user.id,
+        name=payload.name,
+        public_id=next_public_id(
+            db,
+            tenant_code=get_tenant_code_for_school(db, school_id),
+            entity="principal",
+        ),
+    )
     db.add(principal)
     db.flush()
     _record_active_snapshot(db, school_id, principal, user)
@@ -384,7 +405,7 @@ def _consume_valid_otp(db: Session, phone: str, otp: str) -> None:
     db.commit()
 
 
-@router.get("", response_model=ManagementPrincipalOut)
+@router.get("", response_model=ManagementPrincipalOut | None, status_code=200)
 def get_management_principal(
     school_id: int | None = Query(default=None),
     db: Session = Depends(get_db),
@@ -394,11 +415,11 @@ def get_management_principal(
 
     principal = db.query(Principal).filter(Principal.school_id == school_id).first()
     if not principal:
-        raise HTTPException(status_code=404, detail="principal_not_found")
+        return None
 
     user = db.query(User).filter(User.id == principal.user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="principal_not_found")
+        return None
 
     return _to_principal_out(principal, user)
 

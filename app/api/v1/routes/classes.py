@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.deps import get_db, get_current_user, get_valid_school_id
 from app.db.models.class_ import Class
 from app.db.models.user_school import UserSchool
+from app.services.public_id import get_tenant_code_for_school, next_public_id
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
@@ -19,6 +20,7 @@ class ClassCreate(BaseModel):
 
 class ClassOut(BaseModel):
     id: int
+    public_id: str
     school_id: int
     name: str
 
@@ -45,7 +47,12 @@ def create_class(
 ):
     new_class = Class(
         name=payload.name,
-        school_id=school_id  # Use the injected school_id
+        school_id=school_id,
+        public_id=next_public_id(
+            db,
+            tenant_code=get_tenant_code_for_school(db, school_id),
+            entity="class",
+        ),
     )
     db.add(new_class)
     db.commit()

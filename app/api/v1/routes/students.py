@@ -18,6 +18,7 @@ from app.db.models.student import Student
 from app.db.models.student_import_batch import StudentImportBatch
 from app.db.models.subject import Subject
 from app.db.models.user import User
+from app.services.public_id import get_tenant_code_for_school, next_public_id
 
 router = APIRouter(prefix="/students", tags=["students"])
 MAX_IMPORT_ROWS = 5000
@@ -57,6 +58,7 @@ class StudentCreate(BaseModel):
 
 class StudentOut(BaseModel):
     id: int
+    public_id: str
     school_id: int
     student_code: str | None = None
     name: str
@@ -107,6 +109,7 @@ class StudentRecentResult(BaseModel):
 
 class StudentProfileOut(BaseModel):
     id: int
+    public_id: str
     student_code: str
     name: str
     class_id: int | None
@@ -189,6 +192,39 @@ def _clean_text(value: Any) -> str | None:
 
 def _normalize_key(value: str | None) -> str:
     return (value or "").strip().lower()
+
+
+def _normalize_class_key(value: str | None) -> str:
+    if not value:
+        return ""
+    text = _normalize_key(value)
+    text = text.replace("-", " ")
+    tokens = [t for t in text.split() if t not in {"grade", "class", "std", "standard"}]
+    if not tokens:
+        return ""
+    joined = " ".join(tokens)
+    # If a number is present (e.g. 9th, 10), normalize to digits only
+    digits = "".join(ch for ch in joined if ch.isdigit())
+    if digits:
+        return digits
+    # Otherwise, normalize ordinals like "first" -> "1" if possible (lightweight)
+    ordinal_map = {
+        "first": "1",
+        "second": "2",
+        "third": "3",
+        "fourth": "4",
+        "fifth": "5",
+        "sixth": "6",
+        "seventh": "7",
+        "eighth": "8",
+        "ninth": "9",
+        "tenth": "10",
+        "eleventh": "11",
+        "twelfth": "12",
+    }
+    if joined in ordinal_map:
+        return ordinal_map[joined]
+    return joined.replace(" ", "")
 
 
 def _parse_iso_date(value: str | None, field: str, errors: list[str]) -> date | None:
@@ -279,8 +315,9 @@ def list_students(
     return [
         StudentOut(
             id=student.id,
+            public_id=student.public_id,
             school_id=student.school_id,
-            student_code=f"ST-{student.id:04d}",
+            student_code=student.public_id,
             name=student.name,
             first_name=student.first_name,
             last_name=student.last_name,
@@ -327,6 +364,8 @@ def create_student(
         else f"{payload.first_name} {payload.last_name}".strip()
     )
 
+    admission_year = payload.admission_date.year if payload.admission_date else None
+    tenant_code = get_tenant_code_for_school(db, school_id)
     student = Student(
         school_id=school_id,
         name=full_name,
@@ -339,6 +378,12 @@ def create_student(
         admission_date=payload.admission_date,
         parent_phone=payload.parent_phone,
         parent_name=payload.parent_name,
+        public_id=next_public_id(
+            db,
+            tenant_code=tenant_code,
+            entity="student",
+            display_year=admission_year,
+        ),
     )
     db.add(student)
     db.commit()
@@ -377,7 +422,7 @@ async def preview_students_import(
         .all()
     )
     section_map: dict[tuple[str, str], int] = {
-        (_normalize_key(cls.name), _normalize_key(sec.name)): sec.id
+        (_normalize_class_key(cls.name), _normalize_key(sec.name)): sec.id
         for sec, cls in sections
     }
 
@@ -449,7 +494,7 @@ async def preview_students_import(
         section_id = None
         if class_name and section_name:
             section_id = section_map.get(
-                (_normalize_key(class_name), _normalize_key(section_name))
+                (_normalize_class_key(class_name), _normalize_key(section_name))
             )
             if not section_id:
                 errors.append("class_section_not_found")
@@ -590,6 +635,7 @@ def commit_students_import(
     duplicate_rows = 0
     failed_rows = 0
     errors: list[StudentImportRowOut] = []
+    tenant_code = get_tenant_code_for_school(db, school_id)
 
     for row in rows:
         row_number = int(row.get("row_number", 0))
@@ -647,6 +693,12 @@ def commit_students_import(
             duplicate_rows += 1
             continue
 
+        admission_date = (
+            date.fromisoformat(row["admission_date"])
+            if row.get("admission_date")
+            else None
+        )
+        admission_year = admission_date.year if admission_date else None
         student = Student(
             school_id=school_id,
             name=full_name or "",
@@ -658,11 +710,15 @@ def commit_students_import(
             gender=row.get("gender"),
             section_id=section_id,
             roll_number=roll_number,
-            admission_date=date.fromisoformat(row["admission_date"])
-            if row.get("admission_date")
-            else None,
+            admission_date=admission_date,
             parent_phone=parent_phone,
             parent_name=row.get("parent_name"),
+            public_id=next_public_id(
+                db,
+                tenant_code=tenant_code,
+                entity="student",
+                display_year=admission_year,
+            ),
         )
         db.add(student)
         created_rows += 1
@@ -680,22 +736,35 @@ def commit_students_import(
     )
 
 
+def _resolve_student_by_ref(db: Session, school_id: int, student_ref: str) -> Student | None:
+    if student_ref.isdigit():
+        return (
+            db.query(Student)
+            .filter(
+                Student.id == int(student_ref),
+                Student.school_id == school_id,
+            )
+            .first()
+        )
+    return (
+        db.query(Student)
+        .filter(
+            Student.public_id == student_ref,
+            Student.school_id == school_id,
+        )
+        .first()
+    )
+
+
 @router.get("/{student_id}", response_model=StudentProfileOut)
 def get_student_profile(
-    student_id: int,
+    student_id: str,
     db: Session = Depends(get_db),
     school_id: int = Depends(get_valid_school_id),
     current_user: User = Depends(get_current_user),
 ):
     """Retrieves detailed student profile including attendance and marks."""
-    student = (
-        db.query(Student)
-        .filter(
-            Student.id == student_id,
-            Student.school_id == school_id,
-        )
-        .first()
-    )
+    student = _resolve_student_by_ref(db, school_id, student_id)
     if not student:
         raise HTTPException(status_code=404, detail="student_not_found")
 
@@ -724,7 +793,7 @@ def get_student_profile(
         db.query(func.count(AttendanceRecord.id))
         .filter(
             AttendanceRecord.school_id == school_id,
-            AttendanceRecord.student_id == student_id,
+            AttendanceRecord.student_id == student.id,
             AttendanceRecord.status == "present",
         )
         .scalar()
@@ -734,7 +803,7 @@ def get_student_profile(
         db.query(func.count(AttendanceRecord.id))
         .filter(
             AttendanceRecord.school_id == school_id,
-            AttendanceRecord.student_id == student_id,
+            AttendanceRecord.student_id == student.id,
             AttendanceRecord.status == "absent",
         )
         .scalar()
@@ -758,7 +827,7 @@ def get_student_profile(
         )
         .filter(
             MarksRecord.school_id == school_id,
-            MarksRecord.student_id == student_id,
+            MarksRecord.student_id == student.id,
         )
         .order_by(MarksRecord.created_at.desc())
         .limit(3)
@@ -777,7 +846,8 @@ def get_student_profile(
 
     return StudentProfileOut(
         id=student.id,
-        student_code=f"ST-{student.id:04d}",
+        student_code=student.public_id,
+        public_id=student.public_id,
         name=student.name,
         class_id=class_.id if class_ else None,
         class_name=class_.name if class_ else None,
@@ -811,19 +881,12 @@ def get_student_profile(
 
 @router.get("/{student_id}/report-card", response_model=StudentReportCardOut)
 def get_student_report_card(
-    student_id: int,
+    student_id: str,
     db: Session = Depends(get_db),
     school_id: int = Depends(get_valid_school_id),
     current_user: User = Depends(get_current_user),
 ):
-    student = (
-        db.query(Student)
-        .filter(
-            Student.id == student_id,
-            Student.school_id == school_id,
-        )
-        .first()
-    )
+    student = _resolve_student_by_ref(db, school_id, student_id)
     if not student:
         raise HTTPException(status_code=404, detail="student_not_found")
 
@@ -852,7 +915,7 @@ def get_student_report_card(
         db.query(func.count(AttendanceRecord.id))
         .filter(
             AttendanceRecord.school_id == school_id,
-            AttendanceRecord.student_id == student_id,
+            AttendanceRecord.student_id == student.id,
             AttendanceRecord.status == "present",
         )
         .scalar()
@@ -862,7 +925,7 @@ def get_student_report_card(
         db.query(func.count(AttendanceRecord.id))
         .filter(
             AttendanceRecord.school_id == school_id,
-            AttendanceRecord.student_id == student_id,
+            AttendanceRecord.student_id == student.id,
             AttendanceRecord.status == "absent",
         )
         .scalar()
@@ -885,7 +948,7 @@ def get_student_report_card(
         )
         .filter(
             MarksRecord.school_id == school_id,
-            MarksRecord.student_id == student_id,
+            MarksRecord.student_id == student.id,
         )
         .order_by(Subject.name.asc(), MarksRecord.created_at.desc())
         .all()
@@ -914,7 +977,8 @@ def get_student_report_card(
     return StudentReportCardOut(
         student_id=student.id,
         student_name=student.name,
-        student_code=f"ST-{student.id:04d}",
+        student_code=student.public_id,
+        public_id=student.public_id,
         class_name=class_.name if class_ else None,
         section_name=section.name if section else None,
         attendance_percentage=attendance_percentage,
