@@ -28,3 +28,4 @@ from app.db.models.idempotency_key import IdempotencyKey
 from app.db.models.student_import_batch import StudentImportBatch
 from app.db.models.principal_assignment_history import PrincipalAssignmentHistory
 from app.db.models.principal_onboarding_session import PrincipalOnboardingSession
+from app.db.models.public_id_counter import PublicIdCounter

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_db, get_current_user
 from app.db.models.subject import Subject
+from app.services.public_id import get_tenant_code_for_school, next_public_id
 
 router = APIRouter(prefix="/subjects", tags=["subjects"])
 
@@ -19,6 +20,7 @@ class SubjectCreate(BaseModel):
 
 class SubjectOut(BaseModel):
     id: int
+    public_id: str
     school_id: int
     name: str
 
@@ -62,6 +64,11 @@ def create_subject(
     row = Subject(
         school_id=school_id,
         name=payload.name,
+        public_id=next_public_id(
+            db,
+            tenant_code=get_tenant_code_for_school(db, school_id),
+            entity="subject",
+        ),
     )
     db.add(row)
     db.commit()

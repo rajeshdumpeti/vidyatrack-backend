@@ -21,6 +21,18 @@ class StudentNote(Base):
         index=True,
     )
 
+    section_id: Mapped[int | None] = mapped_column(
+        ForeignKey("sections.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    subject_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     author_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_db, get_valid_school_id, require_teacher
+from app.api.v1.deps import get_db, get_valid_school_id, require_teacher_or_principal
 from app.db.models.homework_broadcast import HomeworkBroadcast
 from app.db.models.parent_message import ParentMessage
 from app.db.models.parent_message_recipient import ParentMessageRecipient
@@ -14,6 +14,8 @@ from app.db.models.section_subject_teacher import SectionSubjectTeacher
 from app.db.models.student import Student
 from app.db.models.teacher import Teacher
 from app.db.models.teacher_primary_section import TeacherPrimarySection
+from app.db.models.subject import Subject
+from app.core.roles import normalize_role
 
 router = APIRouter(prefix="/communications", tags=["communications"])
 
@@ -134,7 +136,7 @@ def _ensure_teacher_assigned_to_section(
 def create_homework(
     payload: HomeworkCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_teacher),
+    current_user=Depends(require_teacher_or_principal),
     school_id: int = Depends(get_valid_school_id),
 ):
     if not payload.title.strip():
@@ -143,10 +145,20 @@ def create_homework(
         raise HTTPException(status_code=422, detail="description_required")
 
     _ensure_section_in_school(db, school_id, payload.section_id)
-    teacher = _get_teacher_or_404(db, school_id, current_user.id)
-    _ensure_teacher_assigned_to_section_subject(
-        db, school_id, teacher.id, payload.section_id, payload.subject_id
-    )
+    is_teacher = normalize_role(current_user.role) == "TEACHER"
+    if is_teacher:
+        teacher = _get_teacher_or_404(db, school_id, current_user.id)
+        _ensure_teacher_assigned_to_section_subject(
+            db, school_id, teacher.id, payload.section_id, payload.subject_id
+        )
+    else:
+        subject = (
+            db.query(Subject.id)
+            .filter(Subject.school_id == school_id, Subject.id == payload.subject_id)
+            .first()
+        )
+        if not subject:
+            raise HTTPException(status_code=400, detail="invalid_subject_id")
 
     row = HomeworkBroadcast(
         school_id=school_id,
@@ -180,21 +192,21 @@ def list_homework(
     section_id: int | None = Query(None),
     subject_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    current_user=Depends(require_teacher),
+    current_user=Depends(require_teacher_or_principal),
 ):
-    teacher = _get_teacher_or_404(db, school_id, current_user.id)
-
     if subject_id is not None and section_id is None:
         raise HTTPException(status_code=422, detail="section_id_required_for_subject")
 
     if section_id is not None:
         _ensure_section_in_school(db, school_id, section_id)
         if subject_id is not None:
-            _ensure_teacher_assigned_to_section_subject(
-                db, school_id, teacher.id, section_id, subject_id
+            subject = (
+                db.query(Subject.id)
+                .filter(Subject.school_id == school_id, Subject.id == subject_id)
+                .first()
             )
-        else:
-            _ensure_teacher_assigned_to_section(db, school_id, teacher.id, section_id)
+            if not subject:
+                raise HTTPException(status_code=400, detail="invalid_subject_id")
 
     q = db.query(HomeworkBroadcast).filter(HomeworkBroadcast.school_id == school_id)
 
@@ -203,8 +215,10 @@ def list_homework(
         if subject_id is not None:
             q = q.filter(HomeworkBroadcast.subject_id == subject_id)
     else:
-        # No section filter: return only the teacher's own history
-        q = q.filter(HomeworkBroadcast.created_by_user_id == current_user.id)
+        is_teacher = normalize_role(current_user.role) == "TEACHER"
+        if is_teacher:
+            # No section filter: return only the teacher's own history
+            q = q.filter(HomeworkBroadcast.created_by_user_id == current_user.id)
 
     rows = q.order_by(HomeworkBroadcast.created_at.desc()).all()
     return [
@@ -227,15 +241,17 @@ def list_homework(
 def create_parent_message(
     payload: ParentMessageCreate,
     db: Session = Depends(get_db),
-    current_user=Depends(require_teacher),
+    current_user=Depends(require_teacher_or_principal),
     school_id: int = Depends(get_valid_school_id),
 ):
     if not payload.message.strip():
         raise HTTPException(status_code=422, detail="message_required")
 
     _ensure_section_in_school(db, school_id, payload.section_id)
-    teacher = _get_teacher_or_404(db, school_id, current_user.id)
-    _ensure_teacher_assigned_to_section(db, school_id, teacher.id, payload.section_id)
+    is_teacher = normalize_role(current_user.role) == "TEACHER"
+    if is_teacher:
+        teacher = _get_teacher_or_404(db, school_id, current_user.id)
+        _ensure_teacher_assigned_to_section(db, school_id, teacher.id, payload.section_id)
 
     unique_student_ids = list(dict.fromkeys(payload.student_ids))
     students = (
@@ -285,20 +301,19 @@ def list_parent_messages(
     school_id: int = Depends(get_valid_school_id),
     section_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    current_user=Depends(require_teacher),
+    current_user=Depends(require_teacher_or_principal),
 ):
-    teacher = _get_teacher_or_404(db, school_id, current_user.id)
-
     if section_id is not None:
         _ensure_section_in_school(db, school_id, section_id)
-        _ensure_teacher_assigned_to_section(db, school_id, teacher.id, section_id)
 
     q = db.query(ParentMessage).filter(ParentMessage.school_id == school_id)
     if section_id is not None:
         q = q.filter(ParentMessage.section_id == section_id)
     else:
-        # No section filter: return only the teacher's own history
-        q = q.filter(ParentMessage.created_by_user_id == current_user.id)
+        is_teacher = normalize_role(current_user.role) == "TEACHER"
+        if is_teacher:
+            # No section filter: return only the teacher's own history
+            q = q.filter(ParentMessage.created_by_user_id == current_user.id)
 
     messages = q.order_by(ParentMessage.created_at.desc()).all()
     if not messages:

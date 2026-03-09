@@ -71,9 +71,13 @@ class AttendanceUpdate(BaseModel):
 def list_attendance(
     date: date_type = Query(...),
     section_id: int | None = Query(None),
+    include_defaults: bool = Query(False),
     db: Session = Depends(get_db),
     school_id: int = Depends(get_valid_school_id),
 ):
+    if date > date_type.today():
+        raise HTTPException(status_code=400, detail="future_date_not_allowed")
+
     records_query = (
         db.query(
             AttendanceRecord,
@@ -138,6 +142,9 @@ def list_attendance(
             )
             for record, student_name, student_section_id in records
         ]
+
+    if not include_defaults:
+        return []
 
     students_query = db.query(Student).filter(Student.school_id == school_id)
     if section_id is not None:
