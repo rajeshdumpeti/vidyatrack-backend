@@ -1,0 +1,595 @@
+VidyaTrack Backend API Curl Reference
+
+Purpose
+- This document is the copy-paste API script reference for the current backend.
+- Use it to validate endpoints in Postman before validating from the UI.
+- When any request payload or query shape changes in the backend, update the matching curl block here.
+
+Base URL
+- Local default: http://127.0.0.1:8000/api/v1
+
+Recommended placeholders
+- Replace YOUR_JWT_TOKEN_HERE with a real bearer token from /auth/otp/verify
+- Replace school_id values with a school the user can access
+- Replace IDs such as student_id, section_id, subject_id, teacher_id, class_id with valid values from your environment
+
+Postman usage
+1. Open Postman.
+2. Click Import.
+3. Choose Raw text.
+4. Paste one curl command from this document.
+5. Click Import.
+6. Save it into a collection, for example Backend Smoke Tests.
+7. Edit the URL, token, query params, or request body as needed.
+8. Repeat for other commands.
+
+Recommended Postman environment variables
+- base_url = http://127.0.0.1:8000/api/v1
+- token = paste JWT here
+- school_id = valid school id
+- student_id = valid student id
+- section_id = valid section id
+- subject_id = valid subject id
+- teacher_id = valid teacher id
+- class_id = valid class id
+- attendance_id = valid attendance id
+- draft_id = valid school onboarding draft id
+- principal_session_id = valid principal onboarding session id
+
+If you prefer Postman variables, replace:
+- http://127.0.0.1:8000/api/v1 with {{base_url}}
+- YOUR_JWT_TOKEN_HERE with {{token}}
+
+Auth flow
+
+1. Request OTP
+curl --location 'http://127.0.0.1:8000/api/v1/auth/otp/request' \
+--header 'Content-Type: application/json' \
+--data '{
+  "phone": "9876543210"
+}'
+
+2. Verify OTP
+curl --location 'http://127.0.0.1:8000/api/v1/auth/otp/verify' \
+--header 'Content-Type: application/json' \
+--data '{
+  "phone": "9876543210",
+  "otp": "1234"
+}'
+
+3. Get current auth user
+curl --location 'http://127.0.0.1:8000/api/v1/auth/me' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+4. Auth debug me
+curl --location 'http://127.0.0.1:8000/api/v1/auth/me' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Health
+
+1. Live
+curl --location 'http://127.0.0.1:8000/api/v1/health/live'
+
+2. Ready
+curl --location 'http://127.0.0.1:8000/api/v1/health/ready'
+
+Schools
+
+1. List schools
+curl --location 'http://127.0.0.1:8000/api/v1/schools' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Create school
+curl --location 'http://127.0.0.1:8000/api/v1/schools' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "name": "Gamma School",
+  "school_code": "GAMMA",
+  "admin_phone": "+910000000099",
+  "admin_email": "gamma-admin@example.com"
+}'
+
+3. School dashboard
+curl --location 'http://127.0.0.1:8000/api/v1/schools/18/dashboard' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+4. School teachers
+curl --location 'http://127.0.0.1:8000/api/v1/schools/18/teachers' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+5. School students
+curl --location 'http://127.0.0.1:8000/api/v1/schools/18/students' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+6. School staff
+curl --location 'http://127.0.0.1:8000/api/v1/schools/18/staff' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Dashboard
+
+1. Management dashboard
+curl --location 'http://127.0.0.1:8000/api/v1/management/dashboard' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Principal dashboard
+curl --location 'http://127.0.0.1:8000/api/v1/principal/dashboard' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Academic setup
+
+1. Academic setup by school
+curl --location 'http://127.0.0.1:8000/api/v1/academic-setup?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Classes
+
+1. List classes
+curl --location 'http://127.0.0.1:8000/api/v1/classes?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Create class
+curl --location 'http://127.0.0.1:8000/api/v1/classes?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "name": "Grade 6th"
+}'
+
+Sections
+
+1. List sections
+curl --location 'http://127.0.0.1:8000/api/v1/sections?school_id=18&class_id=1' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Create section
+curl --location 'http://127.0.0.1:8000/api/v1/sections?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "class_id": 1,
+  "name": "A"
+}'
+
+Subjects
+
+1. List subjects
+curl --location 'http://127.0.0.1:8000/api/v1/subjects?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Create subject
+curl --location 'http://127.0.0.1:8000/api/v1/subjects?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "name": "Maths",
+  "school_id": 18
+}'
+
+Teachers
+
+1. List teachers
+curl --location 'http://127.0.0.1:8000/api/v1/teachers?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Create teacher
+curl --location 'http://127.0.0.1:8000/api/v1/teachers' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "name": "Teacher One",
+  "phone": "9876500001",
+  "email": "teacher.one@example.com",
+  "school_id": 18,
+  "section_id": 1
+}'
+
+Management teachers
+
+1. Management create teacher
+curl --location 'http://127.0.0.1:8000/api/v1/management/teachers' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "name": "Teacher Two",
+  "email": "teacher.two@example.com",
+  "phone": "9876500002",
+  "section_id": 1,
+  "school_id": 18
+}'
+
+Teacher self-service
+
+1. Teachers me profile
+curl --location 'http://127.0.0.1:8000/api/v1/teachers/me' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Teachers me context
+curl --location 'http://127.0.0.1:8000/api/v1/teachers/me/context?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+3. Teachers me teaching assignments
+curl --location 'http://127.0.0.1:8000/api/v1/teachers/me/teaching-assignments' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+4. Teachers me attendance section
+curl --location 'http://127.0.0.1:8000/api/v1/teachers/me/attendance-section' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+5. Teachers me readiness
+curl --location 'http://127.0.0.1:8000/api/v1/teachers/me/readiness' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+6. Legacy teacher me attendance section
+curl --location 'http://127.0.0.1:8000/api/v1/teachers/me/attendance-section' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Teaching assignments
+
+1. Create teaching assignment
+curl --location 'http://127.0.0.1:8000/api/v1/teaching-assignments' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "section_id": 1,
+  "subject_id": 11,
+  "teacher_id": 21,
+  "school_id": 18
+}'
+
+2. List teaching assignments
+curl --location 'http://127.0.0.1:8000/api/v1/teaching-assignments?school_id=18&section_id=1&teacher_id=21' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+3. My sections
+curl --location 'http://127.0.0.1:8000/api/v1/teaching-assignments/my-sections?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Students
+
+1. List students
+curl --location 'http://127.0.0.1:8000/api/v1/students?school_id=18&section_id=1' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Create student
+curl --location 'http://127.0.0.1:8000/api/v1/students?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "first_name": "Rahul",
+  "last_name": "Sharma",
+  "date_of_birth": "2012-04-10",
+  "gender": "male",
+  "section_id": 1,
+  "roll_number": "101",
+  "admission_date": "2024-06-01",
+  "parent_phone": "9876511111",
+  "parent_name": "Parent Rahul"
+}'
+
+3. Preview student import
+curl --location 'http://127.0.0.1:8000/api/v1/students/import/preview?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--form 'file=@"/absolute/path/to/students.csv"'
+
+Sample CSV
+first_name,last_name,parent_phone,class_name,section_name,roll_number,date_of_birth
+Rahul,Sharma,9876511111,Grade 6th,A,101,2012-04-10
+Ananya,Verma,9876522222,Grade 6th,A,102,2012-08-21
+
+4. Commit student import
+curl --location 'http://127.0.0.1:8000/api/v1/students/import/commit?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "import_token": "PASTE_IMPORT_TOKEN_FROM_PREVIEW",
+  "mode": "skip_duplicates"
+}'
+
+5. Student profile
+curl --location 'http://127.0.0.1:8000/api/v1/students/101?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+6. Student report card
+curl --location 'http://127.0.0.1:8000/api/v1/students/101/report-card?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Student notes
+
+1. Create student note
+curl --location 'http://127.0.0.1:8000/api/v1/students/101/notes?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "note_text": "Needs improvement in homework completion.",
+  "section_id": 1,
+  "subject_id": 11
+}'
+
+2. List student notes
+curl --location 'http://127.0.0.1:8000/api/v1/students/101/notes?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Attendance
+
+1. List attendance
+curl --location 'http://127.0.0.1:8000/api/v1/attendance?school_id=18&date=2026-03-10&section_id=1&include_defaults=true' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Create attendance
+curl --location 'http://127.0.0.1:8000/api/v1/attendance?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "student_id": 101,
+  "date": "2026-03-10",
+  "status": "present",
+  "school_id": 18
+}'
+
+3. Update attendance
+curl --location --request PUT 'http://127.0.0.1:8000/api/v1/attendance/1?school_id=18&student_id=101&date=2026-03-10' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "status": "absent",
+  "student_id": 101,
+  "date": "2026-03-10"
+}'
+
+4. Submit attendance
+curl --location 'http://127.0.0.1:8000/api/v1/attendance/submit?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "section_id": 1,
+  "date": "2026-03-10"
+}'
+
+Marks
+
+1. Record marks
+curl --location 'http://127.0.0.1:8000/api/v1/marks/record?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "student_id": 101,
+  "subject_id": 11,
+  "exam_type": "mid term",
+  "marks_obtained": 42,
+  "max_marks": 50
+}'
+
+2. Submit marks
+curl --location 'http://127.0.0.1:8000/api/v1/marks/submit?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "section_id": 1,
+  "subject_id": 11,
+  "exam_type": "mid term"
+}'
+
+3. List marks
+curl --location 'http://127.0.0.1:8000/api/v1/marks?school_id=18&section_id=1&subject_id=11&exam_type=mid%20term' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Communications
+
+1. Create homework
+curl --location 'http://127.0.0.1:8000/api/v1/communications/homework?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "section_id": 1,
+  "subject_id": 11,
+  "title": "Algebra practice",
+  "description": "Complete exercises 1 to 10.",
+  "due_date": "2026-03-15"
+}'
+
+2. List homework
+curl --location 'http://127.0.0.1:8000/api/v1/communications/homework?school_id=18&section_id=1&subject_id=11' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+3. Create parent message
+curl --location 'http://127.0.0.1:8000/api/v1/communications/parent-messages?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "section_id": 1,
+  "student_ids": [101, 102],
+  "message": "Tomorrow is parent meeting day.",
+  "subject": "Reminder"
+}'
+
+4. List parent messages
+curl --location 'http://127.0.0.1:8000/api/v1/communications/parent-messages?school_id=18&section_id=1' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Management principal
+
+1. Get management principal
+curl --location 'http://127.0.0.1:8000/api/v1/management/principal?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+2. Principal history
+curl --location 'http://127.0.0.1:8000/api/v1/management/principal/history?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+3. Start principal onboarding
+curl --location 'http://127.0.0.1:8000/api/v1/management/principal/onboarding/start' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "school_id": 18,
+  "name": "Principal One",
+  "phone": "9876500010",
+  "email": "principal.one@example.com"
+}'
+
+4. Resend principal onboarding OTP
+curl --location 'http://127.0.0.1:8000/api/v1/management/principal/onboarding/resend' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "school_id": 18,
+  "session_id": 1
+}'
+
+5. Verify principal onboarding
+curl --location 'http://127.0.0.1:8000/api/v1/management/principal/onboarding/verify' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "school_id": 18,
+  "session_id": 1,
+  "otp": "1234"
+}'
+
+6. Upsert management principal
+curl --location 'http://127.0.0.1:8000/api/v1/management/principal' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "school_id": 18,
+  "name": "Principal One",
+  "phone": "9876500010",
+  "email": "principal.one@example.com"
+}'
+
+7. Register management principal with OTP
+curl --location 'http://127.0.0.1:8000/api/v1/management/principal/register' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "school_id": 18,
+  "name": "Principal One",
+  "phone": "9876500010",
+  "email": "principal.one@example.com"
+}'
+
+8. Retry principal OTP
+curl --location 'http://127.0.0.1:8000/api/v1/management/principal/retry-otp?school_id=18' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+School onboarding phase 1
+
+1. Submit phase 1 onboarding
+curl --location 'http://127.0.0.1:8000/api/v1/platform/schools/onboarding/phase1' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Idempotency-Key: phase1-key-001' \
+--header 'Content-Type: application/json' \
+--data '{
+  "school_name": "Green Valley School",
+  "school_code": "GVS-001",
+  "board": "CBSE",
+  "category": "PRIVATE",
+  "medium": "ENGLISH",
+  "school_type": "CO_ED",
+  "established_year": 2005,
+  "affiliation_number": "AFF-123",
+  "udise_code": "12345678901",
+  "street": "Main Street",
+  "area": "Central",
+  "city": "Bengaluru",
+  "district": "Bengaluru",
+  "state": "Karnataka",
+  "pin_code": "560001",
+  "country": "India",
+  "landmark": "Near Park",
+  "school_phone": "9988776655",
+  "school_email": "info@greenv.edu",
+  "website": "https://greenv.edu",
+  "admin_first_name": "Asha",
+  "admin_last_name": "Rao",
+  "admin_designation": "Administrator",
+  "admin_department": "Operations",
+  "admin_employee_id": "ADM-01",
+  "admin_phone": "9876543210",
+  "admin_email": "asha@greenv.edu",
+  "language_preference": "en",
+  "timezone": "Asia/Kolkata",
+  "current_session": "2025-2026",
+  "academic_start_month": 6,
+  "academic_end_month": 3,
+  "working_days_per_week": 5,
+  "class_levels": ["1", "2"],
+  "lkg_available": true,
+  "ukg_available": true,
+  "pre_nursery_available": false,
+  "modules_enabled": ["attendance", "fees"],
+  "max_students": 1200,
+  "max_teachers": 80,
+  "max_staff": 40,
+  "storage_limit_gb": 100,
+  "api_access": true,
+  "bulk_operations": true,
+  "custom_reports": false
+}'
+
+2. Validate phase 1 payload
+curl --location 'http://127.0.0.1:8000/api/v1/platform/schools/onboarding/phase1/validate' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "school_code": "GVS-001",
+  "udise_code": "12345678901",
+  "school_email": "info@greenv.edu",
+  "admin_phone": "9876543210",
+  "admin_email": "asha@greenv.edu"
+}'
+
+3. Create phase 1 draft
+curl --location 'http://127.0.0.1:8000/api/v1/platform/schools/onboarding/phase1/draft' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "payload": {
+    "school_name": "Draft School",
+    "step": 1
+  }
+}'
+
+4. Update phase 1 draft
+curl --location --request PATCH 'http://127.0.0.1:8000/api/v1/platform/schools/onboarding/phase1/DRAFT_ID_HERE' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE' \
+--header 'Content-Type: application/json' \
+--data '{
+  "payload": {
+    "school_name": "Draft School Updated",
+    "step": 2
+  }
+}'
+
+5. Get phase 1 draft
+curl --location 'http://127.0.0.1:8000/api/v1/platform/schools/onboarding/phase1/DRAFT_ID_HERE' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+Notifications
+
+1. Run notification outbox worker
+curl --location --request POST 'http://127.0.0.1:8000/api/v1/notifications/outbox/run' \
+--header 'Authorization: Bearer YOUR_JWT_TOKEN_HERE'
+
+CMS
+
+1. Get CMS collection
+curl --location 'http://127.0.0.1:8000/api/v1/cms/homepage?query=populate=*' 
+
+Useful notes
+- Many endpoints require Authorization and a school mapping for the supplied school_id.
+- If an endpoint uses get_valid_school_id, you must pass school_id in query params and the JWT user must be mapped to that school.
+- School onboarding and school create flows can create multiple records and may require clean seed data in local environments.
+- Student import preview requires multipart form upload, not JSON.
+- Some teacher endpoints are role-protected and only work for TEACHER users.
+
+Recommended smoke order
+1. /health/live
+2. /health/ready
+3. /auth/otp/request
+4. /auth/otp/verify
+5. /auth/me
+6. /management/dashboard or /principal/dashboard depending on role
+7. list endpoints for school-scoped resources
+8. create endpoints only after list endpoints confirm valid IDs
