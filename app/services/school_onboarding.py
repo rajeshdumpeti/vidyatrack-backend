@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -343,7 +343,7 @@ def update_draft(
         )
     draft.payload = payload
     draft.updated_by = current_user.id
-    draft.updated_at = datetime.utcnow()
+    draft.updated_at = datetime.now(timezone.utc)
     db.add(draft)
     db.commit()
     db.refresh(draft)

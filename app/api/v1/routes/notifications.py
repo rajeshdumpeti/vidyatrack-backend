@@ -1,17 +1,11 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_db, require_management
+from app.api.v1.schemas.notifications import OutboxRunOut
 from app.workers.outbox_worker import process_outbox_batch
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
-
-
-class OutboxRunOut(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    processed: int
 
 
 @router.post("/outbox/run", response_model=OutboxRunOut)
