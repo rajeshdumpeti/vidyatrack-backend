@@ -37,6 +37,7 @@ curl http://127.0.0.1:8000/api/v1/health/ready
 - `tests`: regression coverage
 
 ## Documentation
+- [Backend Environment Configuration](./docs/environment-configuration.md)
 - [Backend Architecture](./docs/backend-architecture.md)
 - [Backend Architecture Longform](./docs/backend-architecture-longform.md)
 - [Backend Junior Onboarding](./docs/backend-junior-onboarding.md)
