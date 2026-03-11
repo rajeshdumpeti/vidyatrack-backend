@@ -35,7 +35,7 @@ def dashboard_client():
     )
 
     db = TestingSessionLocal()
-    school = School(name="Pilot School")
+    school = School(public_id="SCH000000000000000000000000001", name="Pilot School")
     db.add(school)
     db.flush()
 
@@ -66,12 +66,14 @@ def dashboard_client():
             UserSchool(user_id=teacher_user.id, school_id=school.id, role="teacher"),
             UserSchool(user_id=management_user.id, school_id=school.id, role="management"),
             Teacher(
+                public_id="TCH000000000000000000000000001",
                 school_id=school.id,
                 user_id=teacher_user.id,
                 name="Teacher One",
                 email="teacher@example.com",
             ),
             Student(
+                public_id="STD000000000000000000000000001",
                 school_id=school.id,
                 section_id=None,
                 first_name=None,
@@ -111,6 +113,7 @@ def test_school_dashboard_counts_and_lists(dashboard_client):
     assert dashboard.status_code == 200
     assert dashboard.json() == {
         "school_id": school_id,
+        "school_public_id": "SCH000000000000000000000000001",
         "teacher_count": 1,
         "student_count": 1,
         "staff_count": 1,
@@ -144,3 +147,12 @@ def test_school_dashboard_requires_super_admin(dashboard_client):
     response = client.get(f"/api/v1/schools/{school_id}/dashboard")
     assert response.status_code == 403
     assert response.json()["detail"] == "insufficient_permissions"
+
+
+def test_school_dashboard_not_found(dashboard_client):
+    client, _, _ = dashboard_client
+
+    response = client.get("/api/v1/schools/9999/dashboard")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "school_not_found"

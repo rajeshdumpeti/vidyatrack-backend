@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -110,7 +110,7 @@ def next_public_id(
 ) -> str:
     if entity not in ENTITY_CODES:
         raise ValueError(f"Unsupported public_id entity: {entity}")
-    display_year = display_year or datetime.utcnow().year
+    display_year = display_year or datetime.now(timezone.utc).year
     counter_year = _counter_year(entity, display_year)
 
     counter = (

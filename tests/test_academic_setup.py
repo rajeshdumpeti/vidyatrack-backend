@@ -28,12 +28,12 @@ def test_get_academic_setup_returns_classes_sections_subjects():
     try:
         db.add_all(
             [
-                Class(id=1, school_id=18, name="grade 10th"),
-                Class(id=2, school_id=18, name="grade 9th"),
-                Section(id=30, school_id=18, class_id=1, name="A"),
-                Section(id=31, school_id=18, class_id=1, name="B"),
-                Subject(id=11, school_id=18, name="maths"),
-                Subject(id=12, school_id=18, name="english"),
+                Class(id=1, public_id="CLS000000000000000000000000001", school_id=18, name="grade 10th"),
+                Class(id=2, public_id="CLS000000000000000000000000002", school_id=18, name="grade 9th"),
+                Section(id=30, public_id="SEC000000000000000000000000030", school_id=18, class_id=1, name="A"),
+                Section(id=31, public_id="SEC000000000000000000000000031", school_id=18, class_id=1, name="B"),
+                Subject(id=11, public_id="SUB000000000000000000000000011", school_id=18, name="maths"),
+                Subject(id=12, public_id="SUB000000000000000000000000012", school_id=18, name="english"),
             ]
         )
         db.commit()
@@ -78,4 +78,3 @@ def test_get_academic_setup_returns_classes_sections_subjects():
     assert len(body["sections"]) == 2
     assert len(body["subjects"]) == 2
     assert body["sections"][0]["class_name"] == "grade 10th"
-

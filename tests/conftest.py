@@ -2,11 +2,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.api.v1.deps import get_current_user, get_db
 from app.db.base import Base
 from app.db.models.idempotency_key import IdempotencyKey
 from app.db.models.management_admin import ManagementAdmin
+from app.db.models.public_id_counter import PublicIdCounter
 from app.db.models.school import School
 from app.db.models.school_academic_details import SchoolAcademicDetails
 from app.db.models.school_contact import SchoolContact
@@ -20,7 +22,9 @@ from app.main import app
 @pytest.fixture()
 def db_session():
     engine = create_engine(
-        "sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False}
+        "sqlite+pysqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -36,6 +40,7 @@ def db_session():
             ManagementAdmin.__table__,
             SchoolOnboardingDraft.__table__,
             IdempotencyKey.__table__,
+            PublicIdCounter.__table__,
         ],
     )
 

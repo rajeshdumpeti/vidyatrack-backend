@@ -1,52 +1,19 @@
 from fastapi import APIRouter
 
-from app.api.v1.routes import health
-from app.api.v1.routes import schools
-from app.api.v1.routes import teachers
-from app.api.v1.routes import auth
-from app.api.v1.routes import auth_debug
-from app.api.v1.routes import students
-from app.api.v1.routes import classes
-from app.api.v1.routes import sections
-from app.api.v1.routes import attendance
-from app.api.v1.routes import subjects
-from app.api.v1.routes import marks
-from app.api.v1.routes import notifications
-from app.api.v1.routes import student_notes
-from app.api.v1.routes import teaching_assignments
-from app.api.v1.routes import management_teachers
-from app.api.v1.routes import teachers_me
-from app.api.v1.routes import management_principal
-from app.api.v1.routes import management_dashboard
-from app.api.v1.routes import principal_dashboard
-from app.api.v1.routes import communications
-from app.api.v1.routes import school_onboarding
-from app.api.v1.routes import cms
-from app.api.v1.routes import academic_setup
+from app.features.academic.api import router as academic_router
+from app.features.auth.api import router as auth_router
+from app.features.communications.api import router as communications_router
+from app.features.platform.api import router as platform_router
+from app.features.schools.api import router as schools_router
+from app.features.staffing.api import router as staffing_router
+from app.features.students.api import router as students_router
 
 api_router = APIRouter()
 
-
-api_router.include_router(health.router)
-api_router.include_router(schools.router)
-api_router.include_router(teachers.router)
-api_router.include_router(auth.router)
-api_router.include_router(auth_debug.router)
-api_router.include_router(students.router)
-api_router.include_router(classes.router)
-api_router.include_router(sections.router)
-api_router.include_router(attendance.router)
-api_router.include_router(subjects.router)
-api_router.include_router(marks.router)
-api_router.include_router(notifications.router)
-api_router.include_router(student_notes.router)
-api_router.include_router(teaching_assignments.router)
-api_router.include_router(management_teachers.router)
-api_router.include_router(teachers_me.router)
-api_router.include_router(management_principal.router)
-api_router.include_router(management_dashboard.router)
-api_router.include_router(principal_dashboard.router)
-api_router.include_router(communications.router)
-api_router.include_router(school_onboarding.router)
-api_router.include_router(cms.router)
-api_router.include_router(academic_setup.router)
+api_router.include_router(platform_router)
+api_router.include_router(auth_router)
+api_router.include_router(schools_router)
+api_router.include_router(students_router)
+api_router.include_router(academic_router)
+api_router.include_router(staffing_router)
+api_router.include_router(communications_router)
