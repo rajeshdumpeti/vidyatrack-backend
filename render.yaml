@@ -35,7 +35,7 @@ services:
       - key: DB_POOL_RECYCLE_SECONDS
         value: "900"
       - key: CORS_ALLOW_ORIGINS
-        value: https://vidyatrack-dev.vercel.app
+        value: http://localhost:5173,http://127.0.0.1:5173,https://vidyatrack-dev.vercel.app
 
   # Staging mirrors production config shape but keeps a separate Neon database.
   - type: web
