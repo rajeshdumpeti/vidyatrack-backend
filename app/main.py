@@ -16,12 +16,29 @@ logger = logging.getLogger(__name__)
 setup_logging()
 
 
-def _parse_cors_origins(raw: str) -> list[str]:
-    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    return origins or [
+_CORS_BY_ENV: dict[str, list[str]] = {
+    "dev": [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-    ]
+        "https://dev.vidyatrack.in",
+    ],
+    "stage": [
+        "https://stage.vidyatrack.in",
+    ],
+    "prod": [
+        "https://vidyatrack.in",
+        "https://www.vidyatrack.in",
+    ],
+    "test": [
+        "http://localhost:5173",
+    ],
+}
+
+
+def _parse_cors_origins(raw: str) -> list[str]:
+    if raw.strip():
+        return [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return _CORS_BY_ENV.get(settings.environment, _CORS_BY_ENV["dev"])
 
 
 @asynccontextmanager
