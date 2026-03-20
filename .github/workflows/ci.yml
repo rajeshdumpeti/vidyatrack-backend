@@ -2,68 +2,82 @@ name: Backend CI/CD
 
 on:
   pull_request:
-    branches: ["dev", "stage", "main"]
+    branches: [stage, main]
   push:
-    branches: ["dev", "stage", "main"]
+    branches: [dev, stage, main]
 
 concurrency:
-  group: backend-${{ github.workflow }}-${{ github.ref }}
+  group: backend-${{ github.ref }}
   cancel-in-progress: true
 
+# ─────────────────────────────────────────────
+# JOB 1 — CI: Lint + Tests
+# Runs on every push AND every PR to stage/main.
+# Nothing deploys until this job is green.
+# ─────────────────────────────────────────────
 jobs:
-  test:
+  ci:
+    name: CI — Lint & Test
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
+          cache: pip
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check app tests
 
       - name: Import sanity check
-        run: |
-          APP_ENV=test JWT_SECRET=test-secret OTP_PEPPER=test-pepper python -c "import fastapi; import app.main; print('backend imports ok')"
-
-      - name: Basic syntax check (compileall)
-        run: |
-          python -m compileall -q .
+        env:
+          APP_ENV: test
+          JWT_SECRET: ci-secret
+          OTP_PEPPER: ci-pepper
+        run: python -c "import app.main; print('imports ok')"
 
       - name: Run test suite
         env:
           APP_ENV: test
-          JWT_SECRET: test-secret
-          OTP_PEPPER: test-pepper
+          JWT_SECRET: ci-secret
+          OTP_PEPPER: ci-pepper
           OTP_DELIVERY_MODE: provider
           OTP_DEBUG_LOG_PLAINTEXT: "false"
-        run: |
-          pytest -q
+        run: pytest -q
 
-  migrate_and_deploy:
-    runs-on: ubuntu-latest
-    needs: test
+  # ─────────────────────────────────────────────
+  # JOB 2 — Deploy: Migrate + Render + Health check
+  # Only runs on a direct push (not PRs).
+  # Only runs if CI job above is green.
+  # Uses GitHub Environment scoped secrets so
+  # dev/stage/prod each get their own credentials.
+  # ─────────────────────────────────────────────
+  deploy:
+    name: Deploy — ${{ github.ref_name }}
+    needs: ci
     if: github.event_name == 'push'
+    runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref_name == 'main' && 'production' || github.ref_name == 'stage' && 'staging' || 'development' }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: "pip"
+          cache: pip
 
       - name: Install dependencies
         run: |
@@ -71,35 +85,49 @@ jobs:
           pip install -r requirements.txt
 
       - name: Select target environment
+        id: env_select
         run: |
           case "${GITHUB_REF_NAME}" in
-            dev)
-              echo "APP_ENV=dev" >> "$GITHUB_ENV"
-              ;;
-            stage)
-              echo "APP_ENV=stage" >> "$GITHUB_ENV"
-              ;;
-            main)
-              echo "APP_ENV=prod" >> "$GITHUB_ENV"
-              ;;
-            *)
-              echo "Unsupported branch: ${GITHUB_REF_NAME}" >&2
-              exit 1
-              ;;
+            dev)   echo "app_env=dev"   >> "$GITHUB_OUTPUT" ;;
+            stage) echo "app_env=stage" >> "$GITHUB_OUTPUT" ;;
+            main)  echo "app_env=prod"  >> "$GITHUB_OUTPUT" ;;
+            *)     echo "Unknown branch: ${GITHUB_REF_NAME}" >&2; exit 1 ;;
           esac
 
-      - name: Run Alembic migrations
+      - name: Run database migrations
         env:
-          APP_ENV: ${{ env.APP_ENV }}
+          APP_ENV: ${{ steps.env_select.outputs.app_env }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           OTP_PEPPER: ${{ secrets.OTP_PEPPER }}
         run: |
+          echo "Running migrations for $APP_ENV..."
           alembic upgrade head
+          echo "Migrations complete."
 
       - name: Trigger Render deploy
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          test -n "$RENDER_DEPLOY_HOOK_URL"
+          echo "Triggering Render deploy..."
           curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "Deploy triggered. Waiting for Render to build and restart..."
+
+      - name: Wait for health check
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+        run: |
+          echo "Polling: $BACKEND_URL/api/v1/health/ready"
+          # Give Render time to start the build before we begin polling
+          sleep 90
+          for i in $(seq 1 20); do
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/v1/health/ready" || echo "000")
+            echo "Attempt $i/20 — HTTP $HTTP"
+            if [ "$HTTP" = "200" ]; then
+              echo "Health check passed. Deploy successful."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "Health check failed after ~6 minutes. Check Render logs." >&2
+          exit 1

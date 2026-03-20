@@ -1,0 +1,18 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+# E = pycodestyle errors, F = pyflakes (undefined names, etc.), W = pycodestyle warnings
+select = ["E", "F", "W"]
+ignore = [
+  "E501",  # line too long — not enforced in CI
+  "E711",  # comparison to None via == (common in SQLAlchemy filters)
+  "E712",  # comparison to True/False via == (common in SQLAlchemy filters)
+  "W503",  # line break before binary operator
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Model files re-export for SQLAlchemy registry — F401 (unused import) would be a false positive
+"app/db/models/*.py" = ["F401"]
+"app/db/base.py" = ["F401"]
