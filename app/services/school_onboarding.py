@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -22,8 +22,8 @@ from app.db.models.user_school import UserSchool
 from app.db.repositories.school_onboarding import (
     count_schools_created_by,
     find_conflicts,
-    normalize_code,
 )
+from app.services.public_id import next_public_id, derive_tenant_code, ensure_unique_tenant_code
 
 IDEMPOTENCY_SCOPE = "onboarding_phase1"
 
@@ -156,9 +156,18 @@ def create_phase1_onboarding(
     try:
         txn_ctx = db.begin_nested() if db.in_transaction() else db.begin()
         with txn_ctx:
+            tenant_code = ensure_unique_tenant_code(
+                db,
+                derive_tenant_code(payload["school_name"]),
+            )
+            school_public_id = next_public_id(
+                db,
+                tenant_code=tenant_code,
+                entity="school",
+            )
             school = School(
                 name=payload["school_name"].strip(),
-                code=normalize_code(payload["school_code"]),
+                code=tenant_code,
                 board=payload["board"],
                 category=payload["category"],
                 medium=payload["medium"],
@@ -167,6 +176,7 @@ def create_phase1_onboarding(
                 affiliation_number=payload.get("affiliation_number"),
                 udise_code=payload.get("udise_code"),
                 status="ACTIVE",
+                public_id=school_public_id,
                 created_by=current_user.id,
                 updated_by=current_user.id,
             )
@@ -230,9 +240,15 @@ def create_phase1_onboarding(
             db.add(admin_user)
             db.flush()
 
+            admin_public_id = next_public_id(
+                db,
+                tenant_code=tenant_code,
+                entity="management_admin",
+            )
             admin_profile = ManagementAdmin(
                 school_id=school.id,
                 user_id=admin_user.id,
+                public_id=admin_public_id,
                 first_name=payload.get("admin_first_name"),
                 last_name=payload.get("admin_last_name"),
                 designation=payload.get("admin_designation"),
@@ -255,12 +271,14 @@ def create_phase1_onboarding(
         response_payload = {
             "school": {
                 "id": school.id,
+                "public_id": school.public_id,
                 "name": school.name,
                 "code": school.code,
                 "status": school.status,
             },
             "management_admin": {
                 "id": admin_user.id,
+                "public_id": admin_profile.public_id,
                 "phone": admin_user.phone,
                 "email": admin_user.email,
                 "status": "ACTIVE",
@@ -324,7 +342,7 @@ def update_draft(
         )
     draft.payload = payload
     draft.updated_by = current_user.id
-    draft.updated_at = datetime.utcnow()
+    draft.updated_at = datetime.now(timezone.utc)
     db.add(draft)
     db.commit()
     db.refresh(draft)

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
-from typing import Optional
 
 from sqlalchemy.orm import Session
 

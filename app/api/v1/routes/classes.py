@@ -1,53 +1,30 @@
-from typing import List, Optional
+from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.api.v1.deps import get_db, get_current_user, get_valid_school_id
+from app.api.v1.controllers import classes as classes_controller
+from app.api.v1.deps import get_db, get_current_user
+from app.api.v1.schemas.classes import ClassCreate, ClassOut
 from app.db.models.class_ import Class
-from app.db.models.user_school import UserSchool
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
 
-class ClassCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    name: str
-
-
-class ClassOut(BaseModel):
-    id: int
-    school_id: int
-    name: str
-
-    class Config:
-        from_attributes = True
-
-
 @router.get("", response_model=List[ClassOut])
 def list_classes(
-    school_id: int,  # Injecting from query param for multi-school support
+    school_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-):
-    # Filter by the school_id parameter passed from the frontend
-    return db.query(Class).filter(Class.school_id == school_id).all()
+) -> list[Class]:
+    return classes_controller.list_classes(school_id=school_id, db=db)
 
 
 @router.post("", response_model=ClassOut, status_code=201)
 def create_class(
     payload: ClassCreate,
-    school_id: int,  # Get from query parameter
+    school_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
-):
-    new_class = Class(
-        name=payload.name,
-        school_id=school_id  # Use the injected school_id
-    )
-    db.add(new_class)
-    db.commit()
-    db.refresh(new_class)
-    return new_class
+) -> Class:
+    return classes_controller.create_class(payload=payload, school_id=school_id, db=db)
