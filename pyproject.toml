@@ -9,7 +9,6 @@ ignore = [
   "E501",  # line too long — not enforced in CI
   "E711",  # comparison to None via == (common in SQLAlchemy filters)
   "E712",  # comparison to True/False via == (common in SQLAlchemy filters)
-  "W503",  # line break before binary operator
 ]
 
 [tool.ruff.lint.per-file-ignores]
