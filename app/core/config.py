@@ -107,6 +107,10 @@ class Settings(BaseSettings):
         alias="BREVO_OTP_SUBJECT",
     )
 
+    # Super admin bootstrap (set once per environment, never changes after)
+    super_admin_phone: str | None = Field(default=None, alias="SUPER_ADMIN_PHONE")
+    super_admin_email: str | None = Field(default=None, alias="SUPER_ADMIN_EMAIL")
+
     cors_allow_origins: str = Field(
         default=(
             "http://localhost:5173,"

@@ -1,12 +1,15 @@
+import logging
+import time
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.requests import Request
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import setup_logging
-import time
-import logging
-from starlette.requests import Request
-from fastapi.middleware.cors import CORSMiddleware
+from app.db.seed import seed_super_admin
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +21,19 @@ def _parse_cors_origins(raw: str) -> list[str]:
     return origins or [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://vidyatrack-dev.vercel.app"
     ]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    seed_super_admin()
+    yield
 
 
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
