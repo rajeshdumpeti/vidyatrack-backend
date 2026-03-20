@@ -112,11 +112,7 @@ class Settings(BaseSettings):
     super_admin_email: str | None = Field(default=None, alias="SUPER_ADMIN_EMAIL")
 
     cors_allow_origins: str = Field(
-        default=(
-            "http://localhost:5173,"
-            "http://127.0.0.1:5173,"
-            "https://vidyatrack-dev.vercel.app"
-        ),
+        default="",
         alias="CORS_ALLOW_ORIGINS",
     )
 
