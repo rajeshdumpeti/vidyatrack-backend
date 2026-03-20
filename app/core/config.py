@@ -25,10 +25,14 @@ class Settings(BaseSettings):
     # `DATABASE_URL` is an explicit override for one-off jobs and local tooling.
     # Normal multi-environment deploys use the env-specific URLs below.
     database_url: str | None = Field(default=None, alias="DATABASE_URL")
-    database_url_dev: str | None = Field(default=None, alias="DATABASE_URL_DEV")
-    database_url_stage: str | None = Field(default=None, alias="DATABASE_URL_STAGE")
-    database_url_prod: str | None = Field(default=None, alias="DATABASE_URL_PROD")
-    database_url_test: str | None = Field(default=None, alias="DATABASE_URL_TEST")
+    database_url_dev: str | None = Field(
+        default=None, alias="DATABASE_URL_DEV")
+    database_url_stage: str | None = Field(
+        default=None, alias="DATABASE_URL_STAGE")
+    database_url_prod: str | None = Field(
+        default=None, alias="DATABASE_URL_PROD")
+    database_url_test: str | None = Field(
+        default=None, alias="DATABASE_URL_TEST")
 
     # Local development fallback if DATABASE_URL* is intentionally omitted.
     db_host: str = Field(default="127.0.0.1", alias="DB_HOST")
@@ -54,19 +58,22 @@ class Settings(BaseSettings):
 
     # provider -> use WhatsApp/Brevo
     # local_log_only -> skip providers and print OTP in backend logs
-    otp_delivery_mode: str = Field(default="provider", alias="OTP_DELIVERY_MODE")
+    otp_delivery_mode: str = Field(
+        default="provider", alias="OTP_DELIVERY_MODE")
     otp_debug_log_plaintext: bool = Field(
         default=False,
         alias="OTP_DEBUG_LOG_PLAINTEXT",
     )
 
     # WhatsApp Cloud API
-    whatsapp_access_token: str = Field(default="", alias="WHATSAPP_ACCESS_TOKEN")
+    whatsapp_access_token: str = Field(
+        default="", alias="WHATSAPP_ACCESS_TOKEN")
     whatsapp_phone_number_id: str = Field(
         default="",
         alias="WHATSAPP_PHONE_NUMBER_ID",
     )
-    whatsapp_api_version: str = Field(default="v22.0", alias="WHATSAPP_API_VERSION")
+    whatsapp_api_version: str = Field(
+        default="v22.0", alias="WHATSAPP_API_VERSION")
     whatsapp_otp_template_name: str = Field(
         default="",
         alias="WHATSAPP_OTP_TEMPLATE_NAME",
@@ -83,7 +90,8 @@ class Settings(BaseSettings):
         alias="STRAPI_BASE_URL",
     )
     strapi_api_token: str = Field(default="", alias="STRAPI_API_TOKEN")
-    strapi_timeout_seconds: int = Field(default=10, alias="STRAPI_TIMEOUT_SECONDS")
+    strapi_timeout_seconds: int = Field(
+        default=10, alias="STRAPI_TIMEOUT_SECONDS")
 
     # Brevo transactional email (fallback OTP delivery)
     brevo_api_key: str = Field(default="", alias="BREVO_API_KEY")
@@ -92,7 +100,8 @@ class Settings(BaseSettings):
         alias="BREVO_API_BASE_URL",
     )
     brevo_sender_email: str = Field(default="", alias="BREVO_SENDER_EMAIL")
-    brevo_sender_name: str = Field(default="VidyaTrack", alias="BREVO_SENDER_NAME")
+    brevo_sender_name: str = Field(
+        default="VidyaTrack", alias="BREVO_SENDER_NAME")
     brevo_otp_subject: str = Field(
         default="Your VidyaTrack OTP",
         alias="BREVO_OTP_SUBJECT",
