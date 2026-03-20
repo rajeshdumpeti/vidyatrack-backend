@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from app.api.v1.schemas.attendance import (
     AttendanceCreate,
     AttendanceOut,
-    AttendanceSubmissionOut,
     AttendanceSubmitIn,
     AttendanceUpdate,
 )

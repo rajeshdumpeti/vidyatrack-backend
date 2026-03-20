@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from app.api.v1.controllers import student_notes as student_notes_controller
 from app.api.v1.deps import (
     get_db,
-    get_current_user,
     require_teacher_or_management_or_principal,
     get_valid_school_id,
 )

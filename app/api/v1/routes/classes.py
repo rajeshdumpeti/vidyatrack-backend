@@ -1,10 +1,10 @@
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.v1.controllers import classes as classes_controller
-from app.api.v1.deps import get_db, get_current_user, get_valid_school_id
+from app.api.v1.deps import get_db, get_current_user
 from app.api.v1.schemas.classes import ClassCreate, ClassOut
 from app.db.models.class_ import Class
 

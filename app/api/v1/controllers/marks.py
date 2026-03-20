@@ -5,7 +5,6 @@ from app.api.v1.schemas.marks import (
     MarksRecordIn,
     MarksRecordOut,
     MarksSubmissionIn,
-    MarksSubmissionOut,
 )
 from app.db.models.marks_record import MarksRecord
 from app.db.models.marks_submission import MarksSubmission

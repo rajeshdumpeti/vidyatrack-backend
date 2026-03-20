@@ -22,7 +22,6 @@ from app.db.models.user_school import UserSchool
 from app.db.repositories.school_onboarding import (
     count_schools_created_by,
     find_conflicts,
-    normalize_code,
 )
 from app.services.public_id import next_public_id, derive_tenant_code, ensure_unique_tenant_code
 
