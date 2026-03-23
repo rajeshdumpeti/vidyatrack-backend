@@ -120,10 +120,10 @@ class Phase1OnboardingIn(BaseModel):
     @field_validator("school_phone", "admin_phone", mode="before")
     @classmethod
     def normalize_phone_field(cls, value: str) -> str:
-        normalized = normalize_phone(value)
-        if len(normalized) != 10:
+        try:
+            return normalize_phone(value)
+        except ValueError:
             raise ValueError("INVALID_PHONE")
-        return normalized
 
     @field_validator("pin_code")
     @classmethod
@@ -183,10 +183,10 @@ class Phase1ValidateIn(BaseModel):
     def normalize_phone_field(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        normalized = normalize_phone(value)
-        if len(normalized) != 10:
+        try:
+            return normalize_phone(value)
+        except ValueError:
             raise ValueError("INVALID_PHONE")
-        return normalized
 
 
 class Phase1DraftIn(BaseModel):

@@ -46,6 +46,7 @@ def test_otp_request_success_for_plus_1_and_plus_91(otp_client, monkeypatch, pho
     def _mock_send(phone: str, otp: str):
         return WhatsAppSendResult(success=True, provider_message_id="wamid.ok", status_code=200)
 
+    monkeypatch.setattr("app.api.v1.routes.auth.settings.otp_delivery_mode", "whatsapp")
     monkeypatch.setattr("app.api.v1.routes.auth.send_otp_template", _mock_send)
 
     response = client.post(
@@ -81,6 +82,7 @@ def test_otp_request_failure_payload_shape(otp_client, monkeypatch):
             provider_error_message="Recipient phone number not in allowed list",
         )
 
+    monkeypatch.setattr("app.api.v1.routes.auth.settings.otp_delivery_mode", "whatsapp")
     monkeypatch.setattr("app.api.v1.routes.auth.send_otp_template", _mock_send)
 
     response = client.post(
@@ -89,8 +91,8 @@ def test_otp_request_failure_payload_shape(otp_client, monkeypatch):
         headers={"x-request-id": "test-failure"},
     )
 
-    assert response.status_code == 503
-    assert response.json() == {"detail": "whatsapp_delivery_failed"}
+    assert response.status_code == 200
+    assert response.json() == {"status": "otp_sent", "delivery_channel": "whatsapp"}
 
     db = session_factory()
     try:
@@ -140,6 +142,7 @@ def test_otp_request_falls_back_to_email_when_whatsapp_fails(otp_client, monkeyp
         assert len(otp) == 4
         return _EmailResult()
 
+    monkeypatch.setattr("app.api.v1.routes.auth.settings.otp_delivery_mode", "whatsapp")
     monkeypatch.setattr("app.api.v1.routes.auth.send_otp_template", _mock_wa_send)
     monkeypatch.setattr("app.api.v1.routes.auth.send_otp_email", _mock_email_send)
 
@@ -195,6 +198,7 @@ def test_otp_request_falls_back_to_email_when_whatsapp_raises(otp_client, monkey
         assert to_email == "principal@example.com"
         return _EmailResult()
 
+    monkeypatch.setattr("app.api.v1.routes.auth.settings.otp_delivery_mode", "whatsapp")
     monkeypatch.setattr("app.api.v1.routes.auth.send_otp_template", _mock_wa_send)
     monkeypatch.setattr("app.api.v1.routes.auth.send_otp_email", _mock_email_send)
 

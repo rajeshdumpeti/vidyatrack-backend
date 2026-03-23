@@ -6,6 +6,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.v1.deps import get_current_user, get_db
 from app.db.base import Base
+from app.db.models.management_admin import ManagementAdmin
+from app.db.models.principal import Principal
 from app.db.models.school import School
 from app.db.models.student import Student
 from app.db.models.teacher import Teacher
@@ -31,6 +33,8 @@ def dashboard_client():
             UserSchool.__table__,
             Teacher.__table__,
             Student.__table__,
+            Principal.__table__,
+            ManagementAdmin.__table__,
         ],
     )
 
@@ -122,18 +126,18 @@ def test_school_dashboard_counts_and_lists(dashboard_client):
 
     teachers = client.get(f"/api/v1/schools/{school_id}/teachers")
     assert teachers.status_code == 200
-    assert len(teachers.json()) == 1
-    assert teachers.json()[0]["name"] == "Teacher One"
+    assert len(teachers.json()["data"]) == 1
+    assert teachers.json()["data"][0]["name"] == "Teacher One"
 
     students = client.get(f"/api/v1/schools/{school_id}/students")
     assert students.status_code == 200
-    assert len(students.json()) == 1
-    assert students.json()[0]["name"] == "Student One"
+    assert len(students.json()["data"]) == 1
+    assert students.json()["data"][0]["name"] == "Student One"
 
     staff = client.get(f"/api/v1/schools/{school_id}/staff")
     assert staff.status_code == 200
-    assert len(staff.json()) == 1
-    assert staff.json()[0]["role"] == "management"
+    assert len(staff.json()["data"]) == 1
+    assert staff.json()["data"][0]["role"] == "management"
 
 
 def test_school_dashboard_requires_super_admin(dashboard_client):

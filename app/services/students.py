@@ -326,7 +326,10 @@ async def preview_students_import(
         last_name = pick(normalized_row, "last_name")
         name = pick(normalized_row, "name")
         parent_phone_raw = pick(normalized_row, "parent_phone")
-        parent_phone = normalize_phone(parent_phone_raw or "")
+        try:
+            parent_phone = normalize_phone(parent_phone_raw or "")
+        except ValueError:
+            parent_phone = ""
         parent_name = pick(normalized_row, "parent_name")
         class_name = pick(normalized_row, "class_name")
         section_name = pick(normalized_row, "section_name")
