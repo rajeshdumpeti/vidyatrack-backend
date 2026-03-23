@@ -5,10 +5,6 @@ from sqlalchemy.orm import Session
 from app.api.v1.schemas.schools import (
     SchoolCreate,
     SchoolDashboardOut,
-    SchoolOut,
-    SchoolStaffListItem,
-    SchoolStudentListItem,
-    SchoolTeacherListItem,
 )
 from app.db.models.school import School
 from app.db.models.user import User
