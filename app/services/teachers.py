@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import math
+
 from sqlalchemy.orm import Session
 
+from app.api.v1.schemas.schools import PaginatedResponse
 from app.api.v1.schemas.teachers import TeacherCreate, TeacherOut
 from app.core.phone import normalize_phone
 from app.db.models.teacher import Teacher
@@ -12,8 +15,12 @@ from app.db.repositories import teachers as teachers_repository
 from app.services.public_id import get_tenant_code_for_school, next_public_id
 
 
-def list_teachers(*, db: Session, school_id: int) -> list[TeacherOut]:
-    teachers = teachers_repository.list_teachers_for_school(db, school_id=school_id)
+def _build_teacher_outs(
+    teachers: list[Teacher],
+    *,
+    db: Session,
+    school_id: int,
+) -> list[TeacherOut]:
     teacher_ids = [teacher.id for teacher in teachers]
     user_ids = [teacher.user_id for teacher in teachers if teacher.user_id]
 
@@ -62,6 +69,36 @@ def list_teachers(*, db: Session, school_id: int) -> list[TeacherOut]:
         )
         for teacher in teachers
     ]
+
+
+def list_teachers(*, db: Session, school_id: int) -> list[TeacherOut]:
+    teachers = teachers_repository.list_teachers_for_school(db, school_id=school_id)
+    return _build_teacher_outs(teachers, db=db, school_id=school_id)
+
+
+def list_teachers_paginated(
+    *,
+    db: Session,
+    school_id: int,
+    search: str | None = None,
+    page: int = 1,
+    limit: int = 25,
+) -> PaginatedResponse[TeacherOut]:
+    teachers, total = teachers_repository.list_teachers_paginated(
+        db,
+        school_id=school_id,
+        search=search,
+        page=page,
+        limit=limit,
+    )
+    items = _build_teacher_outs(teachers, db=db, school_id=school_id)
+    return PaginatedResponse(
+        data=items,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 1,
+    )
 
 
 def create_teacher(*, db: Session, payload: TeacherCreate) -> Teacher:

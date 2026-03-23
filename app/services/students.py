@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Literal
@@ -9,6 +10,7 @@ from typing import Any, Literal
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
+from app.api.v1.schemas.schools import PaginatedResponse
 from app.api.v1.schemas.students import (
     StudentCreate,
     StudentAttendanceSummary,
@@ -178,6 +180,36 @@ def list_students(*, db: Session, school_id: int, section_id: int | None) -> lis
         _build_student_out(student, section.name if section else None, class_)
         for student, section, class_ in rows
     ]
+
+
+def list_students_paginated(
+    *,
+    db: Session,
+    school_id: int,
+    section_id: int | None = None,
+    search: str | None = None,
+    page: int = 1,
+    limit: int = 25,
+) -> PaginatedResponse[StudentOut]:
+    rows, total = students_repository.list_students_paginated(
+        db,
+        school_id=school_id,
+        section_id=section_id,
+        search=search,
+        page=page,
+        limit=limit,
+    )
+    items = [
+        _build_student_out(student, section.name if section else None, class_)
+        for student, section, class_ in rows
+    ]
+    return PaginatedResponse(
+        data=items,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 1,
+    )
 
 
 def create_student(*, db: Session, school_id: int, payload: StudentCreate) -> Student:

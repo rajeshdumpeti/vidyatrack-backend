@@ -12,7 +12,7 @@ from typing import Any, Callable
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.core.phone import normalize_phone_for_otp, phone_candidates, phone_country_code
+from app.core.phone import to_e164, phone_country_code
 from app.core.roles import normalize_role
 from app.db.models.otp_request import OtpRequest
 from app.db.models.user import User
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 OTP_RATE_LIMIT_SECONDS = 30
 OTP_MAX_PER_HOUR = 5
+OTP_MAX_VERIFY_ATTEMPTS = 5
 
 
 def _hash_otp(phone: str, otp: str, *, otp_pepper: str) -> str:
@@ -68,7 +69,7 @@ def request_otp(
     send_otp_email: Callable[..., Any],
 ) -> dict[str, str]:
     trace_id = request.headers.get("x-request-id", "n/a")
-    normalized_phone = normalize_phone_for_otp(payload_phone)
+    normalized_phone = to_e164(payload_phone)
     country_code = phone_country_code(normalized_phone)
     delivery_mode = otp_delivery_mode.strip().lower()
     now = datetime.now(timezone.utc)
@@ -162,16 +163,16 @@ def request_otp(
         return {"status": "otp_sent", "delivery_channel": "whatsapp"}
 
     if delivery_mode == "email_only":
-        user = auth_repository.get_active_user_by_phone_candidates(
-            db,
-            phone_candidates=phone_candidates(normalized_phone),
-        )
+        user = auth_repository.get_active_user_by_phone(db, phone=normalized_phone)
         email = getattr(user, "email", None) if user else None
         if not email:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="email_not_found_for_phone",
+            # Return generic response to prevent user enumeration (OWASP A07)
+            logger.info(
+                "otp email_only no email found trace_id=%s phone_last4=%s — returning generic response",
+                trace_id,
+                _phone_last4(normalized_phone),
             )
+            return {"status": "otp_sent", "delivery_channel": "email"}
         try:
             email_result = send_otp_email(to_email=email, otp=otp)
         except Exception:
@@ -275,10 +276,7 @@ def request_otp(
         db.add(row)
         db.commit()
 
-    user = auth_repository.get_active_user_by_phone_candidates(
-        db,
-        phone_candidates=phone_candidates(normalized_phone),
-    )
+    user = auth_repository.get_active_user_by_phone(db, phone=normalized_phone)
     email = getattr(user, "email", None) if user else None
     if email:
         try:
@@ -320,10 +318,13 @@ def request_otp(
                 db.commit()
                 return {"status": "otp_sent", "delivery_channel": "email"}
 
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="whatsapp_delivery_failed",
+    # All delivery attempts exhausted — return generic response to prevent enumeration (OWASP A07)
+    logger.warning(
+        "otp all delivery channels failed trace_id=%s phone_last4=%s — returning generic response",
+        trace_id,
+        _phone_last4(normalized_phone),
     )
+    return {"status": "otp_sent", "delivery_channel": "whatsapp"}
 
 
 def verify_otp(
@@ -336,7 +337,7 @@ def verify_otp(
     jwt_ttl_minutes: int,
 ) -> dict[str, str]:
     now = datetime.now(timezone.utc)
-    normalized_phone = normalize_phone_for_otp(payload_phone)
+    normalized_phone = to_e164(payload_phone)
 
     otp_row = auth_repository.get_latest_active_otp_request(
         db,
@@ -358,6 +359,12 @@ def verify_otp(
             detail="otp_not_found",
         )
 
+    if (otp_row.attempt_count or 0) >= OTP_MAX_VERIFY_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="otp_too_many_attempts",
+        )
+
     expected_hash = otp_row.otp_hash
     provided_hash = _hash_otp(normalized_phone, payload_otp, otp_pepper=otp_pepper)
     if not hmac.compare_digest(expected_hash, provided_hash):
@@ -373,10 +380,7 @@ def verify_otp(
     db.add(otp_row)
     db.commit()
 
-    user = auth_repository.get_active_user_by_phone_candidates(
-        db,
-        phone_candidates=phone_candidates(payload_phone),
-    )
+    user = auth_repository.get_active_user_by_phone(db, phone=normalized_phone)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

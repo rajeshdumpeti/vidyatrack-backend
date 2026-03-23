@@ -1,10 +1,9 @@
-from typing import List
-
 from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.api.v1.controllers import students as students_controller
 from app.api.v1.deps import get_db, get_current_user, require_management, get_valid_school_id
+from app.api.v1.schemas.schools import PaginatedResponse
 from app.api.v1.schemas.students import (
     StudentCreate,
     StudentImportCommitIn,
@@ -19,17 +18,24 @@ from app.db.models.user import User
 
 router = APIRouter(prefix="/students", tags=["students"])
 
-@router.get("", response_model=List[StudentOut])
+
+@router.get("", response_model=PaginatedResponse[StudentOut])
 def list_students(
     section_id: int | None = Query(None),
+    search: str | None = Query(None),
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=500),
     db: Session = Depends(get_db),
     school_id: int = Depends(get_valid_school_id),
     current_user: User = Depends(get_current_user),
-) -> list[StudentOut]:
-    return students_controller.list_students(
+) -> PaginatedResponse[StudentOut]:
+    return students_controller.list_students_paginated(
         db=db,
         school_id=school_id,
         section_id=section_id,
+        search=search,
+        page=page,
+        limit=limit,
     )
 
 

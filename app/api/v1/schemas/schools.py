@@ -1,6 +1,35 @@
 from datetime import datetime
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    data: list[T]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
+
+def mask_phone(phone: str) -> str:
+    """Return +91 XXXXX XXXXX keeping last 5 digits."""
+    if not phone:
+        return phone
+    tail = phone[-5:] if len(phone) >= 5 else phone
+    return f"+91 XXXXX {tail}"
+
+
+def mask_email(email: str) -> str:
+    """Return first char + ***@ + domain."""
+    if not email:
+        return email
+    at_idx = email.find("@")
+    if at_idx < 1:
+        return "***"
+    return email[0] + "***@" + email[at_idx + 1:]
 
 
 class SchoolCreate(BaseModel):
