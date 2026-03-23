@@ -20,6 +20,7 @@ def get_recent_otp_request(
         .filter(
             OtpRequest.phone == phone,
             OtpRequest.created_at >= recent_cutoff,
+            OtpRequest.consumed_at.is_(None),  # don't block re-login after a successful auth
         )
         .first()
     )
@@ -41,17 +42,28 @@ def count_hourly_otp_requests(
     )
 
 
+def get_active_user_by_phone(
+    db: Session,
+    *,
+    phone: str,
+) -> User | None:
+    """Exact E.164 lookup — one canonical format, one row."""
+    return (
+        db.query(User)
+        .filter(User.is_active.is_(True), User.phone == phone)
+        .first()
+    )
+
+
 def get_active_user_by_phone_candidates(
     db: Session,
     *,
     phone_candidates: list[str],
 ) -> User | None:
-    return (
-        db.query(User)
-        .filter(User.is_active.is_(True))
-        .filter(User.phone.in_(phone_candidates))
-        .first()
-    )
+    """Deprecated shim — delegates to exact lookup on the first candidate."""
+    if not phone_candidates:
+        return None
+    return get_active_user_by_phone(db, phone=next(iter(phone_candidates)))
 
 
 def get_latest_active_otp_request(

@@ -20,6 +20,7 @@ def list_students_with_sections(
     school_id: int,
     section_id: int | None,
 ) -> list[tuple[Student, Section | None, Class | None]]:
+    """Return ALL students (no pagination) — used for attendance/marks where full list is needed."""
     query = (
         db.query(Student, Section, Class)
         .outerjoin(Section, Section.id == Student.section_id)
@@ -29,6 +30,31 @@ def list_students_with_sections(
     if section_id:
         query = query.filter(Student.section_id == section_id)
     return query.order_by(Student.id.asc()).all()
+
+
+def list_students_paginated(
+    db: Session,
+    *,
+    school_id: int,
+    section_id: int | None = None,
+    search: str | None = None,
+    page: int = 1,
+    limit: int = 25,
+) -> tuple[list[tuple[Student, Section | None, Class | None]], int]:
+    """Paginated student list with optional section + name search."""
+    query = (
+        db.query(Student, Section, Class)
+        .outerjoin(Section, Section.id == Student.section_id)
+        .outerjoin(Class, Class.id == Section.class_id)
+        .filter(Student.school_id == school_id)
+    )
+    if section_id:
+        query = query.filter(Student.section_id == section_id)
+    if search:
+        query = query.filter(Student.name.ilike(f"%{search}%"))
+    total = query.count()
+    items = query.order_by(Student.id.asc()).offset((page - 1) * limit).limit(limit).all()
+    return items, total
 
 
 def get_section_for_school(db: Session, *, school_id: int, section_id: int) -> Section | None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
+from app.api.v1.schemas.schools import PaginatedResponse
 from app.api.v1.schemas.students import (
     StudentCreate,
     StudentImportCommitIn,
@@ -19,6 +20,25 @@ from app.services import students as students_service
 
 def list_students(*, db: Session, school_id: int, section_id: int | None) -> list[StudentOut]:
     return students_service.list_students(db=db, school_id=school_id, section_id=section_id)
+
+
+def list_students_paginated(
+    *,
+    db: Session,
+    school_id: int,
+    section_id: int | None = None,
+    search: str | None = None,
+    page: int = 1,
+    limit: int = 25,
+) -> PaginatedResponse[StudentOut]:
+    return students_service.list_students_paginated(
+        db=db,
+        school_id=school_id,
+        section_id=section_id,
+        search=search,
+        page=page,
+        limit=limit,
+    )
 
 
 def create_student(*, db: Session, school_id: int, payload: StudentCreate) -> Student:

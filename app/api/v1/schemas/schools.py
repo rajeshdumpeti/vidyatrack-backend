@@ -1,6 +1,17 @@
 from datetime import datetime
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    data: list[T]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
 
 
 def mask_phone(phone: str) -> str:

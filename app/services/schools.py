@@ -7,15 +7,16 @@ from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+import math
+
 from app.api.v1.schemas.schools import (
+    PaginatedResponse,
     SchoolCreate,
     SchoolDashboardOut,
     SchoolOut,
     SchoolStaffListItem,
     SchoolStudentListItem,
     SchoolTeacherListItem,
-    mask_email,
-    mask_phone,
 )
 from app.core.roles import normalize_role
 from app.db.models.school import School
@@ -36,8 +37,10 @@ def _get_school_or_404(db: Session, school_id: int) -> School:
     return school
 
 
-def list_schools(*, db: Session) -> list[SchoolOut]:
-    schools = schools_repository.list_schools(db)
+def list_schools(
+    *, db: Session, search: Optional[str] = None, page: int = 1, limit: int = 25
+) -> PaginatedResponse[SchoolOut]:
+    schools, total = schools_repository.list_schools(db, search=search, page=page, limit=limit)
     result: list[SchoolOut] = []
     for school in schools:
         teacher_count = schools_repository.count_teachers(db, school_id=school.id)
@@ -64,7 +67,13 @@ def list_schools(*, db: Session) -> list[SchoolOut]:
                 student_count=student_count,
             )
         )
-    return result
+    return PaginatedResponse(
+        data=result,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 1,
+    )
 
 
 def get_school_dashboard(*, school_id: int, db: Session) -> SchoolDashboardOut:
@@ -82,53 +91,91 @@ def get_school_dashboard(*, school_id: int, db: Session) -> SchoolDashboardOut:
     )
 
 
-def get_school_teachers(*, school_id: int, db: Session) -> list[SchoolTeacherListItem]:
+def get_school_teachers(
+    *, school_id: int, db: Session, page: int = 1, limit: int = 25
+) -> PaginatedResponse[SchoolTeacherListItem]:
     _get_school_or_404(db, school_id)
-    rows = schools_repository.list_school_teachers(db, school_id=school_id)
-    return [
+    rows, total = schools_repository.list_school_teachers_paginated(
+        db, school_id=school_id, page=page, limit=limit
+    )
+    items = [
         SchoolTeacherListItem(
             id=teacher.id,
             school_id=teacher.school_id,
             name=teacher.name,
-            email=mask_email(teacher.email or (user.email if user else None) or ""),
-            phone=mask_phone((user.phone if user else None) or ""),
+            email=teacher.email or (user.email if user else None) or "",
+            phone=(user.phone if user else None) or "",
             status="active" if (not user or user.is_active) else "inactive",
         )
         for teacher, user in rows
     ]
+    return PaginatedResponse(
+        data=items, total=total, page=page, limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 1,
+    )
 
 
-def get_school_students(*, school_id: int, db: Session) -> list[SchoolStudentListItem]:
+def get_school_students(
+    *, school_id: int, db: Session, page: int = 1, limit: int = 25
+) -> PaginatedResponse[SchoolStudentListItem]:
     _get_school_or_404(db, school_id)
-    students = schools_repository.list_school_students(db, school_id=school_id)
-    return [
+    students, total = schools_repository.list_school_students_paginated(
+        db, school_id=school_id, page=page, limit=limit
+    )
+    items = [
         SchoolStudentListItem(
             id=student.id,
             school_id=student.school_id,
             name=student.name,
             parent_name=student.parent_name,
-            parent_phone=mask_phone(student.parent_phone or ""),
+            parent_phone=student.parent_phone or "",
             status="active",
         )
         for student in students
     ]
+    return PaginatedResponse(
+        data=items, total=total, page=page, limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 1,
+    )
 
 
-def get_school_staff(*, school_id: int, db: Session) -> list[SchoolStaffListItem]:
+def _resolve_staff_name(role: str, principal, mgmt_admin, user) -> str:
+    """Pick the best available name for a staff member based on their role."""
+    role_lower = (role or "").lower()
+    if role_lower == "principal" and principal and principal.name:
+        return principal.name
+    if role_lower in ("management", "management_admin") and mgmt_admin:
+        parts = [mgmt_admin.first_name or "", mgmt_admin.last_name or ""]
+        full = " ".join(p for p in parts if p).strip()
+        if full:
+            return full
+    # fallback — email/phone are better than nothing for an admin tool
+    return user.email or user.phone or f"User {user.id}"
+
+
+def get_school_staff(
+    *, school_id: int, db: Session, page: int = 1, limit: int = 25
+) -> PaginatedResponse[SchoolStaffListItem]:
     _get_school_or_404(db, school_id)
-    rows = schools_repository.list_school_staff(db, school_id=school_id)
-    return [
+    rows, total = schools_repository.list_school_staff_paginated(
+        db, school_id=school_id, page=page, limit=limit
+    )
+    items = [
         SchoolStaffListItem(
             user_id=user.id,
             school_id=link.school_id,
             role=link.role,
-            name=(user.email or user.phone or f"User {user.id}"),
-            email=mask_email(user.email or ""),
-            phone=mask_phone(user.phone or ""),
+            name=_resolve_staff_name(link.role, principal, mgmt_admin, user),
+            email=user.email or "",
+            phone=user.phone or "",
             status="active" if user.is_active else "inactive",
         )
-        for link, user in rows
+        for link, user, principal, mgmt_admin in rows
     ]
+    return PaginatedResponse(
+        data=items, total=total, page=page, limit=limit,
+        total_pages=math.ceil(total / limit) if limit else 1,
+    )
 
 
 def create_school(

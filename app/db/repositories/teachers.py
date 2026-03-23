@@ -13,12 +13,30 @@ from app.db.models.user_school import UserSchool
 
 
 def list_teachers_for_school(db: Session, *, school_id: int) -> list[Teacher]:
+    """Return ALL teachers — used internally when building full TeacherOut objects."""
     return (
         db.query(Teacher)
         .filter(Teacher.school_id == school_id)
         .order_by(Teacher.id.asc())
         .all()
     )
+
+
+def list_teachers_paginated(
+    db: Session,
+    *,
+    school_id: int,
+    search: str | None = None,
+    page: int = 1,
+    limit: int = 25,
+) -> tuple[list[Teacher], int]:
+    """Paginated teacher list with optional name search."""
+    query = db.query(Teacher).filter(Teacher.school_id == school_id)
+    if search:
+        query = query.filter(Teacher.name.ilike(f"%{search}%"))
+    total = query.count()
+    items = query.order_by(Teacher.id.asc()).offset((page - 1) * limit).limit(limit).all()
+    return items, total
 
 
 def list_users_by_ids(db: Session, *, user_ids: list[int]) -> list[User]:
