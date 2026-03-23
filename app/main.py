@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.requests import Request
 
 from app.api.v1.router import api_router
@@ -57,8 +58,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_parse_cors_origins(settings.cors_allow_origins),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
 )
 
 
@@ -78,5 +79,15 @@ async def request_logging_middleware(request: Request, call_next):
         },
     )
     return response
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(
+        "unhandled exception",
+        exc_info=exc,
+        extra={"method": request.method, "path": request.url.path},
+    )
+    return JSONResponse(status_code=500, content={"detail": "internal_server_error"})
+
 
 app.include_router(api_router, prefix="/api/v1")
