@@ -74,7 +74,7 @@ def test_submit_phase1_success(client, db_session):
 
 
 def test_submit_phase1_conflict_admin_phone(client, db_session):
-    existing = User(phone="9876543210", email="old@school.com", role="MANAGEMENT", is_active=True)
+    existing = User(phone="+919876543210", email="old@school.com", role="MANAGEMENT", is_active=True)
     db_session.add(existing)
     db_session.commit()
 
@@ -110,7 +110,7 @@ def test_idempotency_key_reuse(client, db_session):
 def test_validate_phase1_reports_conflicts(client, db_session):
     db_session.add(
         User(
-            phone="9876543210",
+            phone="+919876543210",
             email="asha@greenv.edu",
             role="MANAGEMENT",
             is_active=True,

@@ -10,7 +10,7 @@ def test_normalize_phone_for_otp_preserves_e164_plus_91() -> None:
 
 
 def test_normalize_phone_legacy_behavior_is_unchanged() -> None:
-    assert normalize_phone("+16198329657") == "6198329657"
+    assert normalize_phone("+16198329657") == "+16198329657"
 
 
 def test_whatsapp_destination_removes_plus_for_provider() -> None:

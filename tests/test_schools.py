@@ -8,6 +8,8 @@ from app.api.v1.deps import get_current_user, get_db
 from app.db.base import Base
 from app.db.models.public_id_counter import PublicIdCounter
 from app.db.models.school import School
+from app.db.models.student import Student
+from app.db.models.teacher import Teacher
 from app.db.models.user import User
 from app.db.models.user_school import UserSchool
 from app.main import app
@@ -29,6 +31,8 @@ def schools_client():
             School.__table__,
             PublicIdCounter.__table__,
             UserSchool.__table__,
+            Teacher.__table__,
+            Student.__table__,
         ],
     )
 
@@ -60,6 +64,19 @@ def schools_client():
             UserSchool(user_id=2, school_id=18, role="management"),
             UserSchool(user_id=1, school_id=18, role="teacher"),
             UserSchool(user_id=1, school_id=19, role="student"),
+            Teacher(
+                public_id="TCH000000000000000000000000001",
+                school_id=18,
+                user_id=1,
+                name="Super Admin Teacher",
+            ),
+            Student(
+                public_id="STD000000000000000000000000001",
+                school_id=19,
+                section_id=None,
+                name="Test Student",
+                parent_phone="+910000009999",
+            ),
         ]
     )
     db.commit()
@@ -87,11 +104,11 @@ def test_list_schools_includes_role_counts(schools_client):
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 2
-    assert body[0]["teacher_count"] == 1
-    assert body[0]["student_count"] == 0
-    assert body[1]["teacher_count"] == 0
-    assert body[1]["student_count"] == 1
+    assert len(body["data"]) == 2
+    assert body["data"][0]["teacher_count"] == 1
+    assert body["data"][0]["student_count"] == 0
+    assert body["data"][1]["teacher_count"] == 0
+    assert body["data"][1]["student_count"] == 1
 
 
 def test_create_school_as_super_admin(schools_client):
