@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+import threading
+from datetime import datetime, timedelta
+from typing import Optional
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.v1.schemas.schools import (
     SchoolCreate,
     SchoolDashboardOut,
+    SchoolOut,
     SchoolStaffListItem,
     SchoolStudentListItem,
     SchoolTeacherListItem,
+    mask_email,
+    mask_phone,
 )
 from app.core.roles import normalize_role
 from app.db.models.school import School
@@ -16,6 +23,10 @@ from app.db.models.user import User
 from app.db.models.user_school import UserSchool
 from app.db.repositories import schools as schools_repository
 from app.services.public_id import derive_tenant_code, ensure_unique_tenant_code, next_public_id
+
+# In-memory idempotency cache: key -> (School, expires_at)
+_idempotency_cache: dict[str, tuple[School, datetime]] = {}
+_idempotency_lock = threading.Lock()
 
 
 def _get_school_or_404(db: Session, school_id: int) -> School:
@@ -25,20 +36,35 @@ def _get_school_or_404(db: Session, school_id: int) -> School:
     return school
 
 
-def list_schools(*, db: Session) -> list[School]:
+def list_schools(*, db: Session) -> list[SchoolOut]:
     schools = schools_repository.list_schools(db)
+    result: list[SchoolOut] = []
     for school in schools:
-        school.teacher_count = schools_repository.count_user_school_role(
-            db,
-            school_id=school.id,
-            role="teacher",
+        teacher_count = schools_repository.count_teachers(db, school_id=school.id)
+        student_count = schools_repository.count_students(db, school_id=school.id)
+        result.append(
+            SchoolOut(
+                id=school.id,
+                public_id=school.public_id,
+                name=school.name,
+                code=school.code,
+                board=school.board,
+                category=school.category,
+                medium=school.medium,
+                school_type=school.school_type,
+                established_year=school.established_year,
+                affiliation_number=school.affiliation_number,
+                udise_code=school.udise_code,
+                status=school.status,
+                created_by=school.created_by,
+                updated_by=school.updated_by,
+                created_at=school.created_at,
+                updated_at=school.updated_at,
+                teacher_count=teacher_count,
+                student_count=student_count,
+            )
         )
-        school.student_count = schools_repository.count_user_school_role(
-            db,
-            school_id=school.id,
-            role="student",
-        )
-    return schools
+    return result
 
 
 def get_school_dashboard(*, school_id: int, db: Session) -> SchoolDashboardOut:
@@ -64,8 +90,8 @@ def get_school_teachers(*, school_id: int, db: Session) -> list[SchoolTeacherLis
             id=teacher.id,
             school_id=teacher.school_id,
             name=teacher.name,
-            email=teacher.email or (user.email if user else None),
-            phone=(user.phone if user else None),
+            email=mask_email(teacher.email or (user.email if user else None) or ""),
+            phone=mask_phone((user.phone if user else None) or ""),
             status="active" if (not user or user.is_active) else "inactive",
         )
         for teacher, user in rows
@@ -81,7 +107,7 @@ def get_school_students(*, school_id: int, db: Session) -> list[SchoolStudentLis
             school_id=student.school_id,
             name=student.name,
             parent_name=student.parent_name,
-            parent_phone=student.parent_phone,
+            parent_phone=mask_phone(student.parent_phone or ""),
             status="active",
         )
         for student in students
@@ -97,20 +123,34 @@ def get_school_staff(*, school_id: int, db: Session) -> list[SchoolStaffListItem
             school_id=link.school_id,
             role=link.role,
             name=(user.email or user.phone or f"User {user.id}"),
-            email=user.email,
-            phone=user.phone,
+            email=mask_email(user.email or ""),
+            phone=mask_phone(user.phone or ""),
             status="active" if user.is_active else "inactive",
         )
         for link, user in rows
     ]
 
 
-def create_school(*, payload: SchoolCreate, db: Session, current_user: User) -> School:
+def create_school(
+    *, payload: SchoolCreate, db: Session, current_user: User, idempotency_key: Optional[str] = None
+) -> School:
     if normalize_role(current_user.role) != "SUPER_ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only Super Admins can onboard new schools",
         )
+
+    # Idempotency check
+    if idempotency_key:
+        cache_key = f"{current_user.id}:{idempotency_key}"
+        with _idempotency_lock:
+            cached = _idempotency_cache.get(cache_key)
+            if cached:
+                school, expires_at = cached
+                if datetime.utcnow() < expires_at:
+                    return school
+                del _idempotency_cache[cache_key]
+
     try:
         tenant_code = ensure_unique_tenant_code(db, derive_tenant_code(payload.name))
         new_school = School(
@@ -153,6 +193,13 @@ def create_school(*, payload: SchoolCreate, db: Session, current_user: User) -> 
 
         db.commit()
         db.refresh(new_school)
+
+        # Store in idempotency cache with 24h TTL
+        if idempotency_key:
+            cache_key = f"{current_user.id}:{idempotency_key}"
+            with _idempotency_lock:
+                _idempotency_cache[cache_key] = (new_school, datetime.utcnow() + timedelta(hours=24))
+
         return new_school
     except Exception as exc:
         db.rollback()

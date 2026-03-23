@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.v1.controllers import schools as schools_controller
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/schools", tags=["schools"])
 def list_schools(
     db: Session = Depends(get_db),
     _current_user: dict = Depends(get_current_user),
-) -> list[School]:
+) -> list[SchoolOut]:
     return schools_controller.list_schools(db=db)
 
 
@@ -68,5 +68,11 @@ def create_school(
     payload: SchoolCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ) -> School:
-    return schools_controller.create_school(payload=payload, db=db, current_user=current_user)
+    return schools_controller.create_school(
+        payload=payload,
+        db=db,
+        current_user=current_user,
+        idempotency_key=idempotency_key,
+    )

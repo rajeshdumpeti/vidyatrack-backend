@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 OTP_RATE_LIMIT_SECONDS = 30
 OTP_MAX_PER_HOUR = 5
+OTP_MAX_VERIFY_ATTEMPTS = 5
 
 
 def _hash_otp(phone: str, otp: str, *, otp_pepper: str) -> str:
@@ -168,10 +169,13 @@ def request_otp(
         )
         email = getattr(user, "email", None) if user else None
         if not email:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="email_not_found_for_phone",
+            # Return generic response to prevent user enumeration (OWASP A07)
+            logger.info(
+                "otp email_only no email found trace_id=%s phone_last4=%s — returning generic response",
+                trace_id,
+                _phone_last4(normalized_phone),
             )
+            return {"status": "otp_sent", "delivery_channel": "email"}
         try:
             email_result = send_otp_email(to_email=email, otp=otp)
         except Exception:
@@ -320,10 +324,13 @@ def request_otp(
                 db.commit()
                 return {"status": "otp_sent", "delivery_channel": "email"}
 
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail="whatsapp_delivery_failed",
+    # All delivery attempts exhausted — return generic response to prevent enumeration (OWASP A07)
+    logger.warning(
+        "otp all delivery channels failed trace_id=%s phone_last4=%s — returning generic response",
+        trace_id,
+        _phone_last4(normalized_phone),
     )
+    return {"status": "otp_sent", "delivery_channel": "whatsapp"}
 
 
 def verify_otp(
@@ -356,6 +363,12 @@ def verify_otp(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="otp_not_found",
+        )
+
+    if (otp_row.attempt_count or 0) >= OTP_MAX_VERIFY_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="otp_too_many_attempts",
         )
 
     expected_hash = otp_row.otp_hash

@@ -3,6 +3,24 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
+def mask_phone(phone: str) -> str:
+    """Return +91 XXXXX XXXXX keeping last 5 digits."""
+    if not phone:
+        return phone
+    tail = phone[-5:] if len(phone) >= 5 else phone
+    return f"+91 XXXXX {tail}"
+
+
+def mask_email(email: str) -> str:
+    """Return first char + ***@ + domain."""
+    if not email:
+        return email
+    at_idx = email.find("@")
+    if at_idx < 1:
+        return "***"
+    return email[0] + "***@" + email[at_idx + 1:]
+
+
 class SchoolCreate(BaseModel):
     name: str
     school_code: str | None = None
