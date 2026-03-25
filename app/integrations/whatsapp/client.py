@@ -46,14 +46,22 @@ def _parse_error_response(raw_body: str) -> tuple[int | None, str | None]:
 
 
 def send_otp_template(phone: str, otp: str) -> WhatsAppSendResult:
-    if not settings.whatsapp_access_token:
-        raise ValueError("WHATSAPP_ACCESS_TOKEN is not configured")
-    if not settings.whatsapp_phone_number_id:
-        raise ValueError("WHATSAPP_PHONE_NUMBER_ID is not configured")
-    if not settings.whatsapp_otp_template_name:
-        raise ValueError("WHATSAPP_OTP_TEMPLATE_NAME is not configured")
-    if not settings.whatsapp_waba_id:
-        raise ValueError("WHATSAPP_WABA_ID is not configured")
+    missing = next(
+        (name for name, val in [
+            ("WHATSAPP_ACCESS_TOKEN", settings.whatsapp_access_token),
+            ("WHATSAPP_PHONE_NUMBER_ID", settings.whatsapp_phone_number_id),
+            ("WHATSAPP_OTP_TEMPLATE_NAME", settings.whatsapp_otp_template_name),
+            ("WHATSAPP_WABA_ID", settings.whatsapp_waba_id),
+        ] if not val),
+        None,
+    )
+    if missing:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message=f"{missing} is not configured",
+        )
 
     version = settings.whatsapp_api_version.strip("/")
     phone_id = settings.whatsapp_phone_number_id.strip("/")
