@@ -10,6 +10,18 @@ def create_teaching_assignment(
     db: Session,
     payload: TeachingAssignmentCreate,
 ) -> SectionSubjectTeacher:
+    existing = teaching_assignments_repository.get_teaching_assignment(
+        db,
+        school_id=payload.school_id,
+        section_id=payload.section_id,
+        subject_id=payload.subject_id,
+    )
+    if existing:
+        existing.teacher_id = payload.teacher_id
+        db.commit()
+        db.refresh(existing)
+        return existing
+
     new_assignment = SectionSubjectTeacher(
         school_id=payload.school_id,
         section_id=payload.section_id,

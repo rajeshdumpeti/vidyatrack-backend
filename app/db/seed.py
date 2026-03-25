@@ -1,6 +1,7 @@
 import logging
 
 from app.core.config import settings
+from app.core.phone import to_e164
 from app.db.models.user import User
 from app.db.session import SessionLocal
 
@@ -19,6 +20,15 @@ def seed_super_admin() -> None:
         logger.info("SUPER_ADMIN_PHONE not set — skipping super admin seed")
         return
 
+    try:
+        canonical_phone = to_e164(settings.super_admin_phone)
+    except ValueError:
+        logger.error(
+            "SUPER_ADMIN_PHONE '%s' is not a valid phone number — skipping seed",
+            settings.super_admin_phone,
+        )
+        return
+
     db = SessionLocal()
     try:
         existing = (
@@ -31,7 +41,7 @@ def seed_super_admin() -> None:
             return
 
         admin = User(
-            phone=settings.super_admin_phone,
+            phone=canonical_phone,
             email=settings.super_admin_email,
             role="SUPER_ADMIN",
             is_active=True,
@@ -42,7 +52,7 @@ def seed_super_admin() -> None:
         db.commit()
         logger.info(
             "Super admin created",
-            extra={"phone": settings.super_admin_phone},
+            extra={"phone": canonical_phone},
         )
     except Exception:
         db.rollback()

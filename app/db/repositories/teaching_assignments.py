@@ -6,6 +6,24 @@ from app.db.models.section_subject_teacher import SectionSubjectTeacher
 from app.db.models.teacher_section_assignment import TeacherSectionAssignment
 
 
+def get_teaching_assignment(
+    db: Session,
+    *,
+    school_id: int,
+    section_id: int,
+    subject_id: int,
+) -> SectionSubjectTeacher | None:
+    return (
+        db.query(SectionSubjectTeacher)
+        .filter(
+            SectionSubjectTeacher.school_id == school_id,
+            SectionSubjectTeacher.section_id == section_id,
+            SectionSubjectTeacher.subject_id == subject_id,
+        )
+        .first()
+    )
+
+
 def list_teaching_assignments(
     db: Session,
     *,
