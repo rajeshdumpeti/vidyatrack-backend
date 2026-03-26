@@ -8,6 +8,9 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from app.core.uuid import uuid7
 from app.db.base import Base
 
+# Valid teacher statuses — stored as plain strings to avoid Postgres enum migration pain
+TEACHER_STATUSES = ("ACTIVE", "ON_LEAVE", "RESIGNED", "TRANSFERRED")
+
 
 class Teacher(Base):
     __tablename__ = "teachers"
@@ -31,3 +34,7 @@ class Teacher(Base):
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # ACTIVE | ON_LEAVE | RESIGNED | TRANSFERRED
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="ACTIVE"
+    )
