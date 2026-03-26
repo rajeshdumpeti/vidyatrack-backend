@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.schemas.schools import PaginatedResponse
 from app.api.v1.schemas.teachers import TeacherCreate, TeacherOut
 from app.core.phone import normalize_phone
-from app.db.models.teacher import Teacher
+from app.db.models.teacher import Teacher, TEACHER_STATUSES
 from app.db.models.teacher_primary_section import TeacherPrimarySection
 from app.db.models.user import User
 from app.db.models.user_school import UserSchool
@@ -61,9 +61,7 @@ def _build_teacher_outs(
             or (users_by_id[teacher.user_id].email if teacher.user_id in users_by_id else None),
             phone=users_by_id.get(teacher.user_id).phone if teacher.user_id in users_by_id else None,
             employee_id=teacher.public_id,
-            status="active"
-            if (teacher.user_id not in users_by_id or users_by_id[teacher.user_id].is_active)
-            else "inactive",
+            status=teacher.status,
             assigned_section_label=assigned_section_by_teacher.get(teacher.id),
             assignments=assignments_by_teacher.get(teacher.id, []),
         )
@@ -98,6 +96,51 @@ def list_teachers_paginated(
         page=page,
         limit=limit,
         total_pages=math.ceil(total / limit) if limit else 1,
+    )
+
+
+def update_teacher_status(
+    *,
+    db: Session,
+    teacher_id: int,
+    school_id: int,
+    status: str,
+) -> Teacher:
+    if status not in TEACHER_STATUSES:
+        raise ValueError(f"Invalid status '{status}'. Must be one of {TEACHER_STATUSES}.")
+
+    teacher = (
+        db.query(Teacher)
+        .filter(Teacher.id == teacher_id, Teacher.school_id == school_id)
+        .first()
+    )
+    if not teacher:
+        raise ValueError("Teacher not found.")
+
+    teacher.status = status
+
+    # When a teacher resigns or is transferred, also deactivate their login
+    if status in ("RESIGNED", "TRANSFERRED"):
+        user = db.query(User).filter(User.id == teacher.user_id).first()
+        if user:
+            user.is_active = False
+
+    # Re-activate login when status returns to ACTIVE or ON_LEAVE
+    if status in ("ACTIVE", "ON_LEAVE"):
+        user = db.query(User).filter(User.id == teacher.user_id).first()
+        if user:
+            user.is_active = True
+
+    db.commit()
+    db.refresh(teacher)
+    return teacher
+
+
+def get_teacher_by_id(*, db: Session, teacher_id: int, school_id: int) -> Teacher | None:
+    return (
+        db.query(Teacher)
+        .filter(Teacher.id == teacher_id, Teacher.school_id == school_id)
+        .first()
     )
 
 

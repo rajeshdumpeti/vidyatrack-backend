@@ -1,6 +1,12 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+TeacherStatus = Literal["ACTIVE", "ON_LEAVE", "RESIGNED", "TRANSFERRED"]
+
+
+class TeacherStatusUpdate(BaseModel):
+    status: TeacherStatus
 
 
 class TeacherCreate(BaseModel):

@@ -4,8 +4,10 @@ from app.api.v1.schemas.schools import PaginatedResponse
 from app.api.v1.schemas.teachers import TeacherCreate, TeacherOut
 from app.db.models.teacher import Teacher
 from app.services.teachers import create_teacher as create_teacher_service
+from app.services.teachers import get_teacher_by_id as get_teacher_by_id_service
 from app.services.teachers import list_teachers as list_teachers_service
 from app.services.teachers import list_teachers_paginated as list_teachers_paginated_service
+from app.services.teachers import update_teacher_status as update_teacher_status_service
 
 
 def list_teachers(*, db: Session, school_id: int) -> list[TeacherOut]:
@@ -27,3 +29,15 @@ def list_teachers_paginated(
 
 def create_teacher(*, db: Session, payload: TeacherCreate) -> Teacher:
     return create_teacher_service(db=db, payload=payload)
+
+
+def update_teacher_status(
+    *, db: Session, teacher_id: int, school_id: int, status: str
+) -> Teacher:
+    return update_teacher_status_service(
+        db=db, teacher_id=teacher_id, school_id=school_id, status=status
+    )
+
+
+def get_teacher_by_id(*, db: Session, teacher_id: int, school_id: int) -> Teacher | None:
+    return get_teacher_by_id_service(db=db, teacher_id=teacher_id, school_id=school_id)

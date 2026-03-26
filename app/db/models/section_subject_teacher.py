@@ -44,6 +44,12 @@ class SectionSubjectTeacher(Base):
         index=True,
     )
 
+    substitute_teacher_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teachers.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     created_at: Mapped["DateTime"] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
