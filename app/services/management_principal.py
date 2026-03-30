@@ -165,21 +165,48 @@ def upsert_management_principal_internal(
         if hasattr(user_obj, "is_active"):
             setattr(user_obj, "is_active", False)
 
-    if existing_user:
-        existing_access = (
+    def _ensure_principal_school_link(u: User) -> None:
+        """Add a principal user_school entry if one doesn't exist yet."""
+        existing_principal_access = (
             db.query(UserSchool)
             .filter(
-                UserSchool.user_id == existing_user.id,
+                UserSchool.user_id == u.id,
                 UserSchool.school_id == school_id,
+                UserSchool.role == "principal",
             )
             .first()
         )
-        if not existing_access:
-            db.add(UserSchool(user_id=existing_user.id, school_id=school_id, role="principal"))
+        if not existing_principal_access:
+            db.add(UserSchool(
+                user_id=u.id,
+                school_id=school_id,
+                role="principal",
+                is_active=True,
+            ))
+        else:
+            existing_principal_access.is_active = True
 
-        existing_user.role = "PRINCIPAL"
-        if hasattr(existing_user, "is_active"):
-            existing_user.is_active = True
+    def _deactivate_principal_school_link(u: User) -> None:
+        """Soft-deactivate the principal role for a user at this school."""
+        old_link = (
+            db.query(UserSchool)
+            .filter(
+                UserSchool.user_id == u.id,
+                UserSchool.school_id == school_id,
+                UserSchool.role == "principal",
+            )
+            .first()
+        )
+        if old_link:
+            old_link.is_active = False
+
+    if existing_user:
+        # Grant principal access — role-specific check, never overwrites other roles.
+        _ensure_principal_school_link(existing_user)
+
+        # Do NOT overwrite existing_user.role — a management user who is
+        # also principal keeps their management role as primary.
+        # Their JWT for principal sessions is issued via POST /auth/select-role.
         existing_user.phone = normalized_phone
         if payload.email is not None:
             existing_user.email = payload.email
@@ -194,7 +221,8 @@ def upsert_management_principal_internal(
         if existing_principal:
             old_user = db.query(User).filter(User.id == existing_principal.user_id).first()
             if old_user and old_user.id != existing_user.id:
-                _deactivate_user_if_supported(old_user)
+                # Deactivate old user's PRINCIPAL role only — keep other roles intact
+                _deactivate_principal_school_link(old_user)
                 _deactivate_active_history(db, school_id, existing_user.id)
                 _record_deactivated_snapshot(
                     db,
@@ -236,12 +264,12 @@ def upsert_management_principal_internal(
     )
     db.add(user)
     db.flush()
-    db.add(UserSchool(user_id=user.id, school_id=school_id, role="principal"))
+    db.add(UserSchool(user_id=user.id, school_id=school_id, role="principal", is_active=True))
 
     if existing_principal:
         old_user = db.query(User).filter(User.id == existing_principal.user_id).first()
         if old_user and old_user.id != user.id:
-            _deactivate_user_if_supported(old_user)
+            _deactivate_principal_school_link(old_user)
             _deactivate_active_history(db, school_id, user.id)
             _record_deactivated_snapshot(
                 db,
