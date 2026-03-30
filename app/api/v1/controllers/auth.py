@@ -55,5 +55,24 @@ def verify_otp(
     )
 
 
+def select_role(
+    *,
+    db: Session,
+    user: User,
+    school_id: int,
+    role: str,
+    jwt_secret: str,
+    jwt_ttl_minutes: int,
+) -> dict[str, Any]:
+    return auth_service.select_role(
+        db=db,
+        user=user,
+        school_id=school_id,
+        role=role,
+        jwt_secret=jwt_secret,
+        jwt_ttl_minutes=jwt_ttl_minutes,
+    )
+
+
 def get_me(*, db: Session, current_user: User) -> dict[str, Any]:
     return auth_service.get_me(db=db, current_user=current_user)

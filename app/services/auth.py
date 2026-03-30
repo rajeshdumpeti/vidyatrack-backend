@@ -16,6 +16,7 @@ from app.core.phone import to_e164, phone_country_code
 from app.core.roles import normalize_role
 from app.db.models.otp_request import OtpRequest
 from app.db.models.user import User
+from app.db.models.user_school import UserSchool
 from app.db.repositories import auth as auth_repository
 
 logger = logging.getLogger(__name__)
@@ -387,11 +388,70 @@ def verify_otp(
             detail="user_not_found",
         )
 
+    # Build available roles for role-picker support
+    active_school_roles = auth_repository.list_active_user_school_roles(
+        db, user_id=user.id
+    )
+    available_roles = [
+        {
+            "school_id": us.school_id,
+            "school_name": us.school.name if us.school else f"School {us.school_id}",
+            "role": us.role.lower(),
+        }
+        for us in active_school_roles
+    ]
+    requires_role_selection = len(available_roles) > 1
+
     exp = now + timedelta(minutes=jwt_ttl_minutes)
     token_payload = {
         "sub": str(user.id),
         "role": user.role,
         "is_super_admin": normalize_role(user.role) == "SUPER_ADMIN",
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+    }
+    token = _jwt_encode_hs256(token_payload, jwt_secret=jwt_secret)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "requires_role_selection": requires_role_selection,
+        "available_roles": available_roles,
+    }
+
+
+def select_role(
+    *,
+    db: Session,
+    user: User,
+    school_id: int,
+    role: str,
+    jwt_secret: str,
+    jwt_ttl_minutes: int,
+) -> dict[str, Any]:
+    """
+    Issue a new JWT scoped to a specific (school, role) the user has access to.
+    Called after the role-picker step for multi-role users.
+    """
+    normalized = role.strip().lower()
+    valid_roles = {"management", "principal", "teacher", "super_admin"}
+    if normalized not in valid_roles:
+        raise HTTPException(status_code=400, detail="invalid_role")
+
+    access = auth_repository.get_user_school_role(
+        db, user_id=user.id, school_id=school_id, role=normalized
+    )
+    if not access:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="role_not_available",
+        )
+
+    now = datetime.now(timezone.utc)
+    exp = now + timedelta(minutes=jwt_ttl_minutes)
+    token_payload = {
+        "sub": str(user.id),
+        "role": normalized.upper(),  # uppercase to match existing convention
+        "is_super_admin": normalized == "super_admin",
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
     }

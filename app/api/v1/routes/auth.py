@@ -3,7 +3,14 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.controllers import auth as auth_controller
 from app.api.v1.deps import get_current_user, get_db
-from app.api.v1.schemas.auth import OtpRequestIn, OtpRequestOut, OtpVerifyIn, TokenOut
+from app.api.v1.schemas.auth import (
+    OtpRequestIn,
+    OtpRequestOut,
+    OtpVerifyIn,
+    OtpVerifyOut,
+    SelectRoleIn,
+    TokenOut,
+)
 from app.db.models.user import User
 from app.core.config import settings
 from app.integrations.email.brevo import send_otp_email
@@ -36,13 +43,33 @@ def request_otp(
     )
 
 
-@router.post("/otp/verify", response_model=TokenOut, status_code=200)
-def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)) -> TokenOut:
+@router.post("/otp/verify", response_model=OtpVerifyOut, status_code=200)
+def verify_otp(payload: OtpVerifyIn, db: Session = Depends(get_db)) -> OtpVerifyOut:
     return auth_controller.verify_otp(
         payload_phone=payload.phone,
         payload_otp=payload.otp,
         db=db,
         otp_pepper=OTP_PEPPER,
+        jwt_secret=JWT_SECRET,
+        jwt_ttl_minutes=JWT_TTL_MINUTES,
+    )
+
+
+@router.post("/select-role", response_model=TokenOut, status_code=200)
+def select_role(
+    payload: SelectRoleIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TokenOut:
+    """
+    Exchange the initial post-OTP token for a role-scoped token.
+    Called by the role-picker screen when a user has multiple roles.
+    """
+    return auth_controller.select_role(
+        db=db,
+        user=current_user,
+        school_id=payload.school_id,
+        role=payload.role,
         jwt_secret=JWT_SECRET,
         jwt_ttl_minutes=JWT_TTL_MINUTES,
     )

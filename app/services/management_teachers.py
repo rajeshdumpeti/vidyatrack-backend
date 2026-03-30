@@ -33,16 +33,19 @@ def management_create_teacher(
 
     teacher = None
     if existing_user:
-        existing_access = (
+        existing_teacher_access = (
             db.query(UserSchool)
             .filter(
                 UserSchool.user_id == existing_user.id,
                 UserSchool.school_id == school_id,
+                UserSchool.role == "teacher",
             )
             .first()
         )
-        if not existing_access:
-            db.add(UserSchool(user_id=existing_user.id, school_id=school_id, role="teacher"))
+        if not existing_teacher_access:
+            db.add(UserSchool(user_id=existing_user.id, school_id=school_id, role="teacher", is_active=True))
+        elif not existing_teacher_access.is_active:
+            existing_teacher_access.is_active = True
 
         teacher = (
             db.query(Teacher)
@@ -92,7 +95,7 @@ def management_create_teacher(
         db.add(new_user)
         db.flush()
         existing_user = new_user
-        db.add(UserSchool(user_id=existing_user.id, school_id=school_id, role="teacher"))
+        db.add(UserSchool(user_id=existing_user.id, school_id=school_id, role="teacher", is_active=True))
 
     if not teacher:
         teacher = Teacher(

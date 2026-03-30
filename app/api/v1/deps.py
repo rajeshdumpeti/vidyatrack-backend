@@ -66,7 +66,15 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
-    """Dependency to retrieve the authenticated user from the JWT."""
+    """
+    Retrieve the authenticated user from the JWT.
+
+    The role is read from the JWT claim — NOT from the database user.role.
+    This is intentional: a multi-role user (e.g. principal + teacher) can
+    hold different JWTs for different sessions, each with a different role.
+    We override user.role in memory so all downstream require_X guards work
+    correctly without any code changes.
+    """
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="missing_token")
@@ -80,6 +88,11 @@ def get_current_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="user_not_found")
+
+    # Override role from the JWT claim (in-memory only, never committed).
+    # This makes the JWT role authoritative for the current request.
+    if jwt_role := payload.get("role"):
+        user.role = jwt_role
 
     return user
 

@@ -98,3 +98,32 @@ def get_latest_unconsumed_otp_request(db: Session, *, phone: str) -> OtpRequest 
 
 def list_user_schools(db: Session, *, user_id: int) -> list[UserSchool]:
     return db.query(UserSchool).filter(UserSchool.user_id == user_id).all()
+
+
+def list_active_user_school_roles(db: Session, *, user_id: int) -> list[UserSchool]:
+    """Return all active (school, role) pairs for a user — used to build the role picker."""
+    return (
+        db.query(UserSchool)
+        .filter(UserSchool.user_id == user_id, UserSchool.is_active.is_(True))
+        .all()
+    )
+
+
+def get_user_school_role(
+    db: Session,
+    *,
+    user_id: int,
+    school_id: int,
+    role: str,
+) -> UserSchool | None:
+    """Look up one specific (user, school, role) row."""
+    return (
+        db.query(UserSchool)
+        .filter(
+            UserSchool.user_id == user_id,
+            UserSchool.school_id == school_id,
+            UserSchool.role == role.lower(),
+            UserSchool.is_active.is_(True),
+        )
+        .first()
+    )
