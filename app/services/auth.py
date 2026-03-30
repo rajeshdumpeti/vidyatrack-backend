@@ -16,7 +16,6 @@ from app.core.phone import to_e164, phone_country_code
 from app.core.roles import normalize_role
 from app.db.models.otp_request import OtpRequest
 from app.db.models.user import User
-from app.db.models.user_school import UserSchool
 from app.db.repositories import auth as auth_repository
 
 logger = logging.getLogger(__name__)
