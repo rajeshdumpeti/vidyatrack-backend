@@ -65,24 +65,22 @@ class Settings(BaseSettings):
         alias="OTP_DEBUG_LOG_PLAINTEXT",
     )
 
-    # WhatsApp Cloud API
-    whatsapp_access_token: str = Field(
-        default="", alias="WHATSAPP_ACCESS_TOKEN")
-    whatsapp_phone_number_id: str = Field(
-        default="",
-        alias="WHATSAPP_PHONE_NUMBER_ID",
+    # WhatsApp Cloud API (Meta) — commented out, replaced by Twilio
+    # whatsapp_access_token: str = Field(default="", alias="WHATSAPP_ACCESS_TOKEN")
+    # whatsapp_phone_number_id: str = Field(default="", alias="WHATSAPP_PHONE_NUMBER_ID")
+    # whatsapp_api_version: str = Field(default="v22.0", alias="WHATSAPP_API_VERSION")
+    # whatsapp_otp_template_name: str = Field(default="", alias="WHATSAPP_OTP_TEMPLATE_NAME")
+    # whatsapp_otp_template_lang: str = Field(default="en_US", alias="WHATSAPP_OTP_TEMPLATE_LANG")
+    # whatsapp_waba_id: str = Field(default="", alias="WHATSAPP_WABA_ID")
+
+    # Twilio WhatsApp
+    twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
+    twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
+    # Sandbox: whatsapp:+14155238886 — change to your approved number in prod
+    twilio_whatsapp_from: str = Field(
+        default="whatsapp:+14155238886",
+        alias="TWILIO_WHATSAPP_FROM",
     )
-    whatsapp_api_version: str = Field(
-        default="v22.0", alias="WHATSAPP_API_VERSION")
-    whatsapp_otp_template_name: str = Field(
-        default="",
-        alias="WHATSAPP_OTP_TEMPLATE_NAME",
-    )
-    whatsapp_otp_template_lang: str = Field(
-        default="en_US",
-        alias="WHATSAPP_OTP_TEMPLATE_LANG",
-    )
-    whatsapp_waba_id: str = Field(default="", alias="WHATSAPP_WABA_ID")
 
     # CMS (Strapi)
     strapi_base_url: str = Field(

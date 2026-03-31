@@ -36,10 +36,13 @@ def _b64url_encode(data: bytes) -> str:
 
 def _jwt_encode_hs256(payload: dict[str, Any], *, jwt_secret: str) -> str:
     header = {"alg": "HS256", "typ": "JWT"}
-    header_b64 = _b64url_encode(json.dumps(header, separators=(",", ":")).encode("utf-8"))
-    payload_b64 = _b64url_encode(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    header_b64 = _b64url_encode(json.dumps(
+        header, separators=(",", ":")).encode("utf-8"))
+    payload_b64 = _b64url_encode(json.dumps(
+        payload, separators=(",", ":")).encode("utf-8"))
     signing_input = f"{header_b64}.{payload_b64}".encode("utf-8")
-    sig = hmac.new(jwt_secret.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    sig = hmac.new(jwt_secret.encode("utf-8"),
+                   signing_input, hashlib.sha256).digest()
     sig_b64 = _b64url_encode(sig)
     return f"{header_b64}.{payload_b64}.{sig_b64}"
 
@@ -105,7 +108,7 @@ def request_otp(
         logger.info(
             (
                 "otp debug plaintext trace_id=%s phone_country_code=%s "
-                "phone_last4=%s otp=%s"
+                "phone_last4=%s otp===============================%s"
             ),
             trace_id,
             country_code,
@@ -163,7 +166,8 @@ def request_otp(
         return {"status": "otp_sent", "delivery_channel": "whatsapp"}
 
     if delivery_mode == "email_only":
-        user = auth_repository.get_active_user_by_phone(db, phone=normalized_phone)
+        user = auth_repository.get_active_user_by_phone(
+            db, phone=normalized_phone)
         email = getattr(user, "email", None) if user else None
         if not email:
             # Return generic response to prevent user enumeration (OWASP A07)
@@ -366,7 +370,8 @@ def verify_otp(
         )
 
     expected_hash = otp_row.otp_hash
-    provided_hash = _hash_otp(normalized_phone, payload_otp, otp_pepper=otp_pepper)
+    provided_hash = _hash_otp(
+        normalized_phone, payload_otp, otp_pepper=otp_pepper)
     if not hmac.compare_digest(expected_hash, provided_hash):
         otp_row.attempt_count = (otp_row.attempt_count or 0) + 1
         db.add(otp_row)
@@ -459,7 +464,8 @@ def select_role(
 
 
 def get_me(*, db: Session, current_user: User) -> dict[str, Any]:
-    user_schools = auth_repository.list_user_schools(db, user_id=current_user.id)
+    user_schools = auth_repository.list_user_schools(
+        db, user_id=current_user.id)
     return {
         "id": current_user.id,
         "phone": current_user.phone,
