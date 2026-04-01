@@ -101,7 +101,7 @@ def request_otp(
             detail="otp_too_many_requests",
         )
 
-    otp = f"{secrets.randbelow(10_000):04d}"
+    otp = f"{secrets.randbelow(1_000_000):06d}"
     otp_hash = _hash_otp(normalized_phone, otp, otp_pepper=otp_pepper)
 
     if (debug and otp_debug_log_plaintext) or _is_local_request(request):

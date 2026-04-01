@@ -114,6 +114,12 @@ class Settings(BaseSettings):
         alias="CORS_ALLOW_ORIGINS",
     )
 
+    # Used to build password reset links in emails
+    frontend_base_url: str = Field(
+        default="http://localhost:5173",
+        alias="FRONTEND_BASE_URL",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

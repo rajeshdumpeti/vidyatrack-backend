@@ -28,3 +28,5 @@ from app.db.models.student_import_batch import StudentImportBatch
 from app.db.models.principal_assignment_history import PrincipalAssignmentHistory
 from app.db.models.principal_onboarding_session import PrincipalOnboardingSession
 from app.db.models.public_id_counter import PublicIdCounter
+from app.db.models.refresh_token import RefreshToken  # noqa: F401
+from app.db.models.audit_log import AuditLog  # noqa: F401

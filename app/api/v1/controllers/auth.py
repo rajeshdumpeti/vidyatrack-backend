@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models.user import User
 from app.services import auth as auth_service
+from app.services import auth_password as auth_password_service
+from app.services import auth_password_reset as auth_password_reset_service
 
 
 def request_otp(
@@ -76,3 +78,88 @@ def select_role(
 
 def get_me(*, db: Session, current_user: User) -> dict[str, Any]:
     return auth_service.get_me(db=db, current_user=current_user)
+
+
+# ---------------------------------------------------------------------------
+# Password login
+# ---------------------------------------------------------------------------
+
+def login_with_password(
+    *,
+    identifier: str,
+    password: str,
+    remember_me: bool,
+    device_info: dict[str, Any],
+    request: Request,
+    db: Session,
+    send_otp_template: Callable[..., Any],
+    send_otp_email: Callable[..., Any],
+) -> dict[str, Any]:
+    return auth_password_service.login_with_password(
+        identifier=identifier,
+        password=password,
+        remember_me=remember_me,
+        device_info=device_info,
+        request=request,
+        db=db,
+        send_otp_template=send_otp_template,
+        send_otp_email=send_otp_email,
+    )
+
+
+def verify_2fa(*, two_fa_token: str, otp: str, remember_me: bool, db: Session) -> dict[str, Any]:
+    return auth_password_service.verify_2fa(
+        two_fa_token=two_fa_token,
+        otp=otp,
+        remember_me=remember_me,
+        db=db,
+    )
+
+
+def refresh_access_token(*, raw_refresh_token: str, db: Session) -> dict[str, Any]:
+    return auth_password_service.refresh_access_token(
+        raw_refresh_token=raw_refresh_token,
+        db=db,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Password reset
+# ---------------------------------------------------------------------------
+
+def forgot_password(
+    *,
+    identifier: str,
+    db: Session,
+    send_otp_template: Callable[..., Any],
+    send_otp_email: Callable[..., Any],
+) -> dict[str, Any]:
+    return auth_password_reset_service.forgot_password(
+        identifier=identifier,
+        db=db,
+        send_otp_template=send_otp_template,
+        send_otp_email=send_otp_email,
+    )
+
+
+def verify_reset_otp(*, phone_or_email: str, otp: str, db: Session) -> dict[str, Any]:
+    return auth_password_reset_service.verify_reset_otp(
+        phone_or_email=phone_or_email,
+        otp=otp,
+        db=db,
+    )
+
+
+def reset_password(
+    *,
+    reset_token: str,
+    new_password: str,
+    confirm_password: str,
+    db: Session,
+) -> dict[str, Any]:
+    return auth_password_reset_service.reset_password(
+        reset_token=reset_token,
+        new_password=new_password,
+        confirm_password=confirm_password,
+        db=db,
+    )

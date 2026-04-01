@@ -18,6 +18,9 @@ class OtpRequest(Base):
 
     attempt_count: Mapped[int] = mapped_column(nullable=False, default=0)
 
+    # login | password_reset | login_2fa
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False, default="login")
+
     channel: Mapped[str] = mapped_column(String(16), nullable=False, default="WHATSAPP")
 
     provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
