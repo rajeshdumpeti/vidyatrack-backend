@@ -4,12 +4,18 @@ from sqlalchemy.orm import Session
 from app.api.v1.controllers import auth as auth_controller
 from app.api.v1.deps import get_current_user, get_db
 from app.api.v1.schemas.auth import (
+    ForgotPasswordIn,
     OtpRequestIn,
     OtpRequestOut,
     OtpVerifyIn,
     OtpVerifyOut,
+    PasswordLoginIn,
+    RefreshTokenIn,
+    ResetPasswordIn,
     SelectRoleIn,
     TokenOut,
+    Verify2FAIn,
+    VerifyResetOtpIn,
 )
 from app.db.models.user import User
 from app.core.config import settings
@@ -22,6 +28,10 @@ OTP_PEPPER = settings.otp_pepper
 JWT_SECRET = settings.jwt_secret
 JWT_TTL_MINUTES = settings.jwt_ttl_minutes
 
+
+# ---------------------------------------------------------------------------
+# Existing OTP login (unchanged)
+# ---------------------------------------------------------------------------
 
 @router.post("/otp/request", response_model=OtpRequestOut, status_code=200)
 def request_otp(
@@ -61,10 +71,6 @@ def select_role(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TokenOut:
-    """
-    Exchange the initial post-OTP token for a role-scoped token.
-    Called by the role-picker screen when a user has multiple roles.
-    """
     return auth_controller.select_role(
         db=db,
         user=current_user,
@@ -81,3 +87,76 @@ def get_me(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     return auth_controller.get_me(db=db, current_user=current_user)
+
+
+# ---------------------------------------------------------------------------
+# Password login
+# ---------------------------------------------------------------------------
+
+@router.post("/login", status_code=200)
+def login_with_password(
+    payload: PasswordLoginIn,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> dict:
+    return auth_controller.login_with_password(
+        identifier=payload.identifier,
+        password=payload.password,
+        remember_me=payload.remember_me,
+        device_info=payload.device_info.model_dump(),
+        request=request,
+        db=db,
+        send_otp_template=send_otp_template,
+        send_otp_email=send_otp_email,
+    )
+
+
+@router.post("/verify-2fa", status_code=200)
+def verify_2fa(payload: Verify2FAIn, db: Session = Depends(get_db)) -> dict:
+    return auth_controller.verify_2fa(
+        two_fa_token=payload.two_fa_token,
+        otp=payload.otp,
+        remember_me=payload.remember_me,
+        db=db,
+    )
+
+
+@router.post("/refresh", status_code=200)
+def refresh_token(payload: RefreshTokenIn, db: Session = Depends(get_db)) -> dict:
+    return auth_controller.refresh_access_token(
+        raw_refresh_token=payload.refresh_token,
+        db=db,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Password reset
+# ---------------------------------------------------------------------------
+
+@router.post("/forgot-password", status_code=200)
+def forgot_password(payload: ForgotPasswordIn, db: Session = Depends(get_db)) -> dict:
+    return auth_controller.forgot_password(
+        identifier=payload.identifier,
+        db=db,
+        send_otp_template=send_otp_template,
+        send_otp_email=send_otp_email,
+    )
+
+
+@router.post("/verify-otp", status_code=200)
+def verify_reset_otp(payload: VerifyResetOtpIn, db: Session = Depends(get_db)) -> dict:
+    return auth_controller.verify_reset_otp(
+        phone_or_email=payload.phone,
+        otp=payload.otp,
+        db=db,
+    )
+
+
+@router.post("/reset-password", status_code=200)
+def reset_password(payload: ResetPasswordIn, db: Session = Depends(get_db)) -> dict:
+    return auth_controller.reset_password(
+        reset_token=payload.reset_token,
+        new_password=payload.new_password,
+        confirm_password=payload.confirm_password,
+        db=db,
+    )
