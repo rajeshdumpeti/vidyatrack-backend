@@ -197,8 +197,8 @@ def login_with_password(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
-                "code": "INVALID_CREDENTIALS",
-                "message": "Incorrect email/phone or password.",
+                "code": "NO_PASSWORD_SET",
+                "message": "This account has no password set. Use OTP login or reset your password.",
                 "lockout_until": None,
                 "attempts_remaining": None,
                 "support_contact": "+919876543210",
