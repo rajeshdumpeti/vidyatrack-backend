@@ -149,7 +149,7 @@ def get_superadmin_schools(
     _is_test_expr = or_(*_test_conditions)
 
     if not show_test:
-        stmt = stmt.where(~_is_test_expr)
+        stmt = stmt.where(School.is_test.is_(False), ~_is_test_expr)
 
     # ── summary counts (before setup filter, after status/test/search) ────────
 
@@ -157,7 +157,9 @@ def get_superadmin_schools(
     all_active = db.execute(
         select(func.count()).where(School.status.ilike("ACTIVE"))
     ).scalar_one()
-    all_pilot = 0  # plan_type not in schema yet — placeholder
+    all_pilot = db.execute(
+        select(func.count()).where(School.plan_type.ilike("pilot"))
+    ).scalar_one()
     incomplete_sq = (
         select(func.count(School.id))
         .outerjoin(teacher_sq, teacher_sq.c.school_id == School.id)
@@ -215,9 +217,8 @@ def get_superadmin_schools(
 
         school_name_lower = school.name.lower()
         code_lower = (school.code or "").lower()
-        is_test = any(
-            kw in school_name_lower or kw in code_lower
-            for kw in _test_keywords
+        is_test = bool(school.is_test) or any(
+            kw in school_name_lower or kw in code_lower for kw in _test_keywords
         )
 
         mgmt_login_aware = None
@@ -229,12 +230,12 @@ def get_superadmin_schools(
             )
 
         schools_out.append({
-            "id": school.id,
+            "id": str(school.internal_id),
             "vt_school_id": school.public_id,
             "name": school.name,
             "initials": _initials(school.name),
             "status": _normalize_status(school.status),
-            "plan_type": "pilot",  # placeholder until plan_type column is added
+            "plan_type": (school.plan_type or "pilot").lower(),
             "is_test": is_test,
             "setup_completion_pct": _setup_pct(t_count, s_count),
             "stats": {

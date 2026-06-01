@@ -12,7 +12,10 @@ def list_sections_with_class_names(
     school_id: int,
     class_id: int | None,
 ) -> list[tuple[Section, str]]:
-    query = db.query(Section).filter(Section.school_id == school_id)
+    query = db.query(Section).filter(
+        Section.school_id == school_id,
+        Section.is_active.is_(True),
+    )
 
     if class_id:
         query = query.filter(Section.class_id == class_id)

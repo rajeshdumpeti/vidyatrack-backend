@@ -9,6 +9,7 @@ from app.db.models.attendance_record import AttendanceRecord  # noqa: F401
 from app.db.models.attendance_submission import AttendanceSubmission  # noqa: F401
 from app.db.models.notification_outbox import NotificationOutbox  # noqa: F401
 from app.db.models.subject import Subject  # noqa: F401
+from app.db.models.class_subject import ClassSubject  # noqa: F401
 from app.db.models.marks_record import MarksRecord  # noqa: F401
 from app.db.models.marks_submission import MarksSubmission  # noqa: F401
 from app.db.models.teacher_primary_section import TeacherPrimarySection
@@ -21,6 +22,7 @@ from app.db.models.parent_message_recipient import ParentMessageRecipient
 from app.db.models.school_contact import SchoolContact
 from app.db.models.school_academic_details import SchoolAcademicDetails
 from app.db.models.school_features import SchoolFeatures
+from app.db.models.school_grade import SchoolGrade
 from app.db.models.management_admin import ManagementAdmin
 from app.db.models.school_onboarding_draft import SchoolOnboardingDraft
 from app.db.models.idempotency_key import IdempotencyKey
@@ -30,3 +32,12 @@ from app.db.models.principal_onboarding_session import PrincipalOnboardingSessio
 from app.db.models.public_id_counter import PublicIdCounter
 from app.db.models.refresh_token import RefreshToken  # noqa: F401
 from app.db.models.audit_log import AuditLog  # noqa: F401
+from app.db.models.staff_compensation_profile import StaffCompensationProfile  # noqa: F401
+from app.db.models.staff_payroll_record import StaffPayrollRecord  # noqa: F401
+
+# Fees (Phase 1)
+from app.db.models.fee_head import FeeHead  # noqa: F401
+from app.db.models.fee_structure import FeeStructure  # noqa: F401
+from app.db.models.fee_structure_item import FeeStructureItem  # noqa: F401
+from app.db.models.fee_receipt_counter import FeeReceiptCounter  # noqa: F401
+from app.db.models.fee_payment import FeePayment, FeePaymentItem  # noqa: F401

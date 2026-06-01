@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.phone import phone_candidates
@@ -30,14 +31,16 @@ def find_conflicts(
             conflicts.append("SCHOOL_CODE_ALREADY_EXISTS")
 
     if udise_code:
-        exists = db.query(School.id).filter(School.udise_code == udise_code).first()
+        normalized_udise = udise_code.strip()
+        exists = db.query(School.id).filter(func.trim(School.udise_code) == normalized_udise).first()
         if exists:
             conflicts.append("UDISE_CODE_ALREADY_EXISTS")
 
     if school_email:
+        normalized_email = school_email.strip().lower()
         exists = (
             db.query(SchoolContact.id)
-            .filter(SchoolContact.school_email == school_email)
+            .filter(func.lower(func.trim(SchoolContact.school_email)) == normalized_email)
             .first()
         )
         if exists:
@@ -53,7 +56,12 @@ def find_conflicts(
             conflicts.append("ADMIN_PHONE_ALREADY_EXISTS")
 
     if admin_email:
-        exists = db.query(User.id).filter(User.email == admin_email).first()
+        normalized_admin_email = admin_email.strip().lower()
+        exists = (
+            db.query(User.id)
+            .filter(func.lower(func.trim(User.email)) == normalized_admin_email)
+            .first()
+        )
         if exists:
             conflicts.append("ADMIN_EMAIL_ALREADY_EXISTS")
 

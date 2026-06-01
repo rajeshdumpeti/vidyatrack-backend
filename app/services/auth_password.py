@@ -41,7 +41,7 @@ REFRESH_TOKEN_DAYS_REMEMBER_ME = 30
 
 # Portal redirect URLs by role
 PORTAL_URLS: dict[str, str] = {
-    "super_admin": "/platform",
+    "super_admin": "/superadmin/overview",
     "management": "/management",
     "principal": "/principal",
     "teacher": "/teacher",
@@ -264,6 +264,24 @@ def login_with_password(
             send_otp_template=send_otp_template,
             send_otp_email=send_otp_email,
         )
+
+    # Block non-super-admin logins when the school is suspended (PRD requirement)
+    schools = auth_repo.list_active_user_school_roles(db, user_id=user.id)
+    if schools:
+        first = schools[0]
+        school = first.school
+        if school and getattr(school, "status", "").strip().upper() == "SUSPENDED":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "code": "SCHOOL_SUSPENDED",
+                    "message": getattr(school, "suspension_reason", None)
+                    or "School account suspended. Contact VidyaTrack support.",
+                    "lockout_until": None,
+                    "attempts_remaining": None,
+                    "support_contact": "+919876543210",
+                },
+            )
 
     return _issue_tokens(
         user=user, now=now, remember_me=remember_me, db=db,

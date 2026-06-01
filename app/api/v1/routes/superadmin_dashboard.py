@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.v1.deps import get_db, require_super_admin
+from app.core.phone import normalize_phone
 from app.db.models.user import User
 from app.services.superadmin_dashboard import get_platform_dashboard
 from app.services.superadmin_schools import get_superadmin_schools
@@ -18,6 +19,21 @@ def superadmin_dashboard(
     _: User = Depends(require_super_admin),
 ) -> dict:
     return get_platform_dashboard(db)
+
+
+@router.get("/check-phone")
+def check_phone_availability(
+    phone: str = Query(..., min_length=10),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_super_admin),
+) -> dict:
+    """Check if a phone number is already registered as a user."""
+    try:
+        normalized = normalize_phone(phone)
+    except ValueError:
+        return {"available": False, "reason": "INVALID_PHONE"}
+    exists = db.query(User).filter(User.phone == normalized).first() is not None
+    return {"available": not exists}
 
 
 @router.get("/schools")

@@ -14,11 +14,27 @@ class StudentCreate(BaseModel):
     last_name: str | None = Field(default=None, min_length=1, max_length=100)
     date_of_birth: date | None = None
     gender: str | None = None
+    status: Literal["DRAFT", "ACTIVE"] = "ACTIVE"
+    academic_year: str | None = None
     section_id: int | None = None
     roll_number: str | None = Field(default=None, min_length=1, max_length=32)
     admission_date: date | None = None
+    admission_number: str | None = Field(default=None, min_length=1, max_length=64)
+    blood_group: str | None = None
+    nationality: str | None = None
+    religion: str | None = None
+    caste_category: str | None = None
+    mother_tongue: str | None = None
+    aadhaar_number: str | None = None
+    birth_cert_number: str | None = None
+    previous_school_name: str | None = None
+    previous_school_tc_number: str | None = None
+    address: str | None = None
     parent_phone: str
     parent_name: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_relation: str | None = None
+    emergency_contact_phone: str | None = None
 
     @model_validator(mode="after")
     def validate_name(self) -> "StudentCreate":
@@ -33,6 +49,37 @@ class StudentCreate(BaseModel):
         if self.last_name is not None:
             self.last_name = self.last_name.strip()
         return self
+
+
+class StudentUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = None
+    first_name: str | None = Field(default=None, min_length=1, max_length=100)
+    last_name: str | None = Field(default=None, min_length=1, max_length=100)
+    date_of_birth: date | None = None
+    gender: str | None = None
+    status: Literal["DRAFT", "ACTIVE"] | None = None
+    academic_year: str | None = None
+    section_id: int | None = None
+    roll_number: str | None = Field(default=None, min_length=1, max_length=32)
+    admission_date: date | None = None
+    admission_number: str | None = Field(default=None, min_length=1, max_length=64)
+    blood_group: str | None = None
+    nationality: str | None = None
+    religion: str | None = None
+    caste_category: str | None = None
+    mother_tongue: str | None = None
+    aadhaar_number: str | None = None
+    birth_cert_number: str | None = None
+    previous_school_name: str | None = None
+    previous_school_tc_number: str | None = None
+    address: str | None = None
+    parent_phone: str | None = None
+    parent_name: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_relation: str | None = None
+    emergency_contact_phone: str | None = None
 
 
 class StudentOut(BaseModel):
@@ -51,6 +98,7 @@ class StudentOut(BaseModel):
     class_name: str | None = None
     roll_number: str | None = None
     admission_date: date | None = None
+    academic_year: str | None = None
     parent_phone: str
     parent_name: str | None = None
     status: str | None = None
@@ -62,7 +110,12 @@ class StudentPersonalDetails(BaseModel):
     date_of_birth: str | None = None
     gender: str | None = None
     blood_group: str | None = None
+    nationality: str | None = None
     religion: str | None = None
+    caste_category: str | None = None
+    mother_tongue: str | None = None
+    aadhaar_number: str | None = None
+    birth_cert_number: str | None = None
     address: str | None = None
 
 
@@ -96,6 +149,10 @@ class StudentProfileOut(BaseModel):
     section_id: int | None
     section_name: str | None
     status: str
+    academic_year: str | None = None
+    admission_number: str | None = None
+    previous_school_name: str | None = None
+    previous_school_tc_number: str | None = None
     personal_details: StudentPersonalDetails
     guardians: list[StudentGuardianOut]
     attendance: StudentAttendanceSummary
@@ -115,8 +172,12 @@ class StudentReportCardOut(BaseModel):
     student_id: int
     student_name: str
     student_code: str
+    public_id: str
     class_name: str | None
     section_name: str | None
+    school_name: str | None = None
+    school_address: str | None = None
+    academic_year: str | None = None
     attendance_percentage: float
     present_days: int
     absent_days: int

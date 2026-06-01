@@ -1,6 +1,10 @@
+import uuid
+
 from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.uuid import uuid7
 from app.db.base import Base
 
 
@@ -8,6 +12,9 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    internal_id: Mapped[uuid.UUID] = mapped_column(
+        PGUUID(as_uuid=True), unique=True, nullable=False, default=uuid7
+    )
 
     # school_id: Mapped[int | None] = mapped_column(
     #     ForeignKey("schools.id", ondelete="CASCADE"),

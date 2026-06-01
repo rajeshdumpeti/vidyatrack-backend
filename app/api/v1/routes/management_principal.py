@@ -14,7 +14,11 @@ from app.api.v1.schemas.management_principal import (
     ManagementPrincipalOtpRetryOut,
     ManagementPrincipalOut,
     ManagementPrincipalRegisterOut,
+    PrincipalOnboardingCancelIn,
+    PrincipalOnboardingCancelOut,
+    PrincipalOnboardingSessionOut,
     PrincipalHistoryOut,
+    PrincipalTimelineOut,
     PrincipalOnboardingResendIn,
     PrincipalOnboardingStartOut,
     PrincipalOnboardingVerifyIn,
@@ -74,6 +78,32 @@ def list_principal_history(
     )
 
 
+@router.get("/timeline", response_model=PrincipalTimelineOut)
+def get_principal_timeline(
+    school_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+) -> PrincipalTimelineOut:
+    return management_principal_controller.get_principal_timeline(
+        school_id=school_id,
+        db=db,
+        current_user=current_user,
+    )
+
+
+@router.get("/onboarding/session", response_model=PrincipalOnboardingSessionOut | None)
+def get_latest_principal_onboarding_session(
+    school_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+) -> PrincipalOnboardingSessionOut | None:
+    return management_principal_controller.get_latest_principal_onboarding_session(
+        school_id=school_id,
+        db=db,
+        current_user=current_user,
+    )
+
+
 @router.post("/onboarding/start", response_model=PrincipalOnboardingStartOut, status_code=200)
 def start_principal_onboarding(
     payload: ManagementPrincipalIn,
@@ -124,6 +154,20 @@ def verify_principal_onboarding(
         db=db,
         current_user=current_user,
         otp_pepper=OTP_PEPPER,
+    )
+
+
+@router.post("/onboarding/cancel", response_model=PrincipalOnboardingCancelOut, status_code=200)
+def cancel_principal_onboarding(
+    payload: PrincipalOnboardingCancelIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_management),
+) -> PrincipalOnboardingCancelOut:
+    return management_principal_controller.cancel_principal_onboarding(
+        school_id=payload.school_id,
+        session_id=payload.session_id,
+        db=db,
+        current_user=current_user,
     )
 
 

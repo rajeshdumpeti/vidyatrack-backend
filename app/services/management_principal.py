@@ -14,9 +14,14 @@ from app.api.v1.schemas.management_principal import (
     ManagementPrincipalOut,
     ManagementPrincipalRegisterOut,
     PrincipalHistoryOut,
+    PrincipalOnboardingCancelOut,
+    PrincipalOnboardingSessionOut,
     PrincipalOnboardingStartOut,
+    PrincipalTimelineItemOut,
+    PrincipalTimelineOut,
     PrincipalOnboardingVerifyOut,
 )
+from app.db.models.audit_log import AuditLog
 from app.core.phone import normalize_phone_for_otp, phone_candidates
 from app.db.models.otp_request import OtpRequest
 from app.db.models.principal import Principal
@@ -75,6 +80,57 @@ def _to_principal_out(principal: Principal, user: User) -> ManagementPrincipalOu
     )
 
 
+def _to_onboarding_session_out(session: PrincipalOnboardingSession) -> PrincipalOnboardingSessionOut:
+    return PrincipalOnboardingSessionOut(
+        session_id=session.id,
+        name=session.name,
+        phone_masked=_mask_phone(session.phone),
+        email=session.email,
+        status=session.status,
+        expires_at=session.expires_at,
+        created_at=session.created_at,
+        verified_at=session.verified_at,
+    )
+
+
+def _expire_stale_pending_sessions(db: Session, school_id: int) -> None:
+    now = datetime.now(timezone.utc)
+    stale_rows = (
+        db.query(PrincipalOnboardingSession)
+        .filter(
+            PrincipalOnboardingSession.school_id == school_id,
+            PrincipalOnboardingSession.status == "PENDING",
+            PrincipalOnboardingSession.expires_at <= now,
+        )
+        .all()
+    )
+    updated = False
+    for row in stale_rows:
+        row.status = "EXPIRED"
+        db.add(row)
+        updated = True
+    if updated:
+        db.commit()
+
+
+def _cancel_other_pending_sessions(db: Session, school_id: int) -> None:
+    rows = (
+        db.query(PrincipalOnboardingSession)
+        .filter(
+            PrincipalOnboardingSession.school_id == school_id,
+            PrincipalOnboardingSession.status == "PENDING",
+        )
+        .all()
+    )
+    for row in rows:
+        row.status = "CANCELLED"
+        db.add(row)
+
+
+def _log_principal_event(db: Session, *, user_id: int | None, event: str, identifier: str | None) -> None:
+    db.add(AuditLog(user_id=user_id, event=event, identifier=identifier))
+
+
 def _list_deactivated_principals(db: Session, school_id: int) -> list[PrincipalHistoryOut]:
     rows = (
         db.query(PrincipalAssignmentHistory)
@@ -97,6 +153,68 @@ def _list_deactivated_principals(db: Session, school_id: int) -> list[PrincipalH
         )
         for row in rows
     ]
+
+
+def get_principal_timeline(
+    *,
+    school_id: int,
+    db: Session,
+    current_user: User,
+) -> PrincipalTimelineOut:
+    school_id = _resolve_management_school_id(db, current_user, school_id)
+    _expire_stale_pending_sessions(db, school_id)
+
+    session_rows = (
+        db.query(PrincipalOnboardingSession)
+        .filter(PrincipalOnboardingSession.school_id == school_id)
+        .order_by(PrincipalOnboardingSession.id.desc())
+        .limit(10)
+        .all()
+    )
+    history_rows = (
+        db.query(PrincipalAssignmentHistory)
+        .filter(PrincipalAssignmentHistory.school_id == school_id)
+        .order_by(PrincipalAssignmentHistory.assigned_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    items: list[PrincipalTimelineItemOut] = []
+    for row in session_rows:
+        title_map = {
+            "PENDING": "Principal onboarding started",
+            "VERIFIED": "Principal OTP verified",
+            "CANCELLED": "Principal onboarding cancelled",
+            "EXPIRED": "Principal onboarding expired",
+        }
+        description = f"{row.name} • {_mask_phone(row.phone)}"
+        if row.email:
+            description = f"{description} • {row.email}"
+        items.append(
+            PrincipalTimelineItemOut(
+                id=f"session-{row.id}",
+                event_type="onboarding_session",
+                title=title_map.get(row.status, "Principal onboarding updated"),
+                description=description,
+                status=row.status,
+                created_at=row.verified_at or row.created_at,
+            )
+        )
+
+    for row in history_rows:
+        items.append(
+            PrincipalTimelineItemOut(
+                id=f"history-{row.id}",
+                event_type="assignment_history",
+                title="Principal assignment updated" if row.status == "ACTIVE" else "Principal deactivated",
+                description=f"{row.name} • {row.phone}{f' • {row.email}' if row.email else ''}",
+                status=row.status,
+                created_at=row.deactivated_at or row.assigned_at,
+            )
+        )
+
+    items.sort(key=lambda item: item.created_at, reverse=True)
+    return PrincipalTimelineOut(items=items[:12])
 
 
 def _deactivate_active_history(db: Session, school_id: int, replaced_by_user_id: int) -> None:
@@ -360,6 +478,25 @@ def get_management_principal(
     return _to_principal_out(principal, user)
 
 
+def get_latest_principal_onboarding_session(
+    *,
+    school_id: int,
+    db: Session,
+    current_user: User,
+) -> PrincipalOnboardingSessionOut | None:
+    school_id = _resolve_management_school_id(db, current_user, school_id)
+    _expire_stale_pending_sessions(db, school_id)
+    session = (
+        db.query(PrincipalOnboardingSession)
+        .filter(PrincipalOnboardingSession.school_id == school_id)
+        .order_by(PrincipalOnboardingSession.id.desc())
+        .first()
+    )
+    if not session:
+        return None
+    return _to_onboarding_session_out(session)
+
+
 def list_principal_history(
     *,
     school_id: int,
@@ -381,6 +518,8 @@ def start_principal_onboarding(
     otp_ttl_minutes: int,
 ) -> PrincipalOnboardingStartOut:
     school_id = _resolve_management_school_id(db, current_user, payload.school_id)
+    _expire_stale_pending_sessions(db, school_id)
+    _cancel_other_pending_sessions(db, school_id)
     otp_result = request_otp_fn(otp_request_payload_factory(phone=payload.phone), request, db)
 
     session = PrincipalOnboardingSession(
@@ -393,6 +532,12 @@ def start_principal_onboarding(
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=otp_ttl_minutes),
     )
     db.add(session)
+    _log_principal_event(
+        db,
+        user_id=current_user.id,
+        event="principal_onboarding_started",
+        identifier=str(school_id),
+    )
     db.commit()
     db.refresh(session)
 
@@ -434,6 +579,12 @@ def resend_principal_onboarding_otp(
     otp_result = request_otp_fn(otp_request_payload_factory(phone=session.phone), request, db)
     session.expires_at = datetime.now(timezone.utc) + timedelta(minutes=otp_ttl_minutes)
     db.add(session)
+    _log_principal_event(
+        db,
+        user_id=current_user.id,
+        event="principal_onboarding_otp_resent",
+        identifier=str(school_id),
+    )
     db.commit()
     db.refresh(session)
 
@@ -492,6 +643,12 @@ def verify_principal_onboarding(
     session.status = "VERIFIED"
     session.verified_at = datetime.now(timezone.utc)
     db.add(session)
+    _log_principal_event(
+        db,
+        user_id=current_user.id,
+        event="principal_onboarding_verified",
+        identifier=str(school_id),
+    )
     db.commit()
 
     return PrincipalOnboardingVerifyOut(
@@ -589,3 +746,38 @@ def retry_principal_otp(
             otp_error_code=str(exc.detail),
             message="Unable to resend OTP right now. Please try again shortly.",
         )
+
+
+def cancel_principal_onboarding(
+    *,
+    school_id: int,
+    session_id: int,
+    db: Session,
+    current_user: User,
+) -> PrincipalOnboardingCancelOut:
+    school_id = _resolve_management_school_id(db, current_user, school_id)
+    session = (
+        db.query(PrincipalOnboardingSession)
+        .filter(
+            PrincipalOnboardingSession.id == session_id,
+            PrincipalOnboardingSession.school_id == school_id,
+        )
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="onboarding_session_not_found")
+    if session.status != "PENDING":
+        raise HTTPException(status_code=409, detail="onboarding_session_not_pending")
+    session.status = "CANCELLED"
+    db.add(session)
+    _log_principal_event(
+        db,
+        user_id=current_user.id,
+        event="principal_onboarding_cancelled",
+        identifier=str(school_id),
+    )
+    db.commit()
+    return PrincipalOnboardingCancelOut(
+        success=True,
+        message="Pending principal onboarding request cancelled.",
+    )

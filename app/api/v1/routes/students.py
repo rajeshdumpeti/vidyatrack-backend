@@ -12,6 +12,7 @@ from app.api.v1.schemas.students import (
     StudentOut,
     StudentProfileOut,
     StudentReportCardOut,
+    StudentUpdate,
 )
 from app.db.models.student import Student
 from app.db.models.user import User
@@ -49,6 +50,22 @@ def create_student(
     return students_controller.create_student(
         db=db,
         school_id=school_id,
+        payload=payload,
+    )
+
+
+@router.patch("/{student_id}", response_model=StudentOut)
+def update_student(
+    student_id: str,
+    payload: StudentUpdate,
+    db: Session = Depends(get_db),
+    school_id: int = Depends(get_valid_school_id),
+    current_user: User = Depends(require_management),
+) -> Student:
+    return students_controller.update_student(
+        db=db,
+        school_id=school_id,
+        student_id=student_id,
         payload=payload,
     )
 

@@ -107,7 +107,7 @@ def get_platform_dashboard(db: Session) -> dict[str, Any]:
                     else f"No {'teachers' if t == 0 else 'students'} registered yet."
                 ),
                 "days_since_created": days_since,
-                "action_url": f"/platform/schools/{school.id}",
+                "action_url": f"/superadmin/schools/{school.internal_id}",
             })
 
         if school.id in never_logged_school_ids:
@@ -118,7 +118,7 @@ def get_platform_dashboard(db: Session) -> dict[str, Any]:
                 "severity": "warning",
                 "message": "Management Admin has never logged in. Credentials may not have been received.",
                 "days_since_created": days_since,
-                "action_url": f"/platform/schools/{school.id}",
+                "action_url": f"/superadmin/schools/{school.internal_id}",
             })
 
     # Sort: critical first, then by days_since desc

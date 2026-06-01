@@ -4,6 +4,7 @@ from app.api.v1.routes import (
     academic_setup,
     attendance,
     classes,
+    management_setup,
     marks,
     sections,
     subjects,
@@ -14,6 +15,7 @@ router = APIRouter()
 router.include_router(classes.router)
 router.include_router(sections.router)
 router.include_router(subjects.router)
+router.include_router(management_setup.router)
 router.include_router(attendance.router)
 router.include_router(marks.router)
 router.include_router(teaching_assignments.router)

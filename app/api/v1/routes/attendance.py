@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.api.v1.controllers import attendance as attendance_controller
-from app.api.v1.deps import get_db, get_current_user, get_valid_school_id
+from app.api.v1.deps import get_db, get_current_user, require_school_module
 from app.api.v1.schemas.attendance import (
     AttendanceCreate,
     AttendanceOut,
@@ -26,7 +26,7 @@ def list_attendance(
     section_id: int | None = Query(None),
     include_defaults: bool = Query(False),
     db: Session = Depends(get_db),
-    school_id: int = Depends(get_valid_school_id),
+    school_id: int = Depends(require_school_module("attendance")),
 ) -> list[AttendanceOut]:
     return attendance_controller.list_attendance(
         db=db,
@@ -45,7 +45,7 @@ def create_attendance(
     payload: AttendanceCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    school_id: int = Depends(get_valid_school_id),
+    school_id: int = Depends(require_school_module("attendance")),
 ) -> AttendanceRecord:
     return attendance_controller.create_attendance(
         payload=payload,
@@ -60,7 +60,7 @@ def update_attendance(
     attendance_id: int,
     payload: AttendanceUpdate,
     db: Session = Depends(get_db),
-    school_id: int = Depends(get_valid_school_id),
+    school_id: int = Depends(require_school_module("attendance")),
     current_user: User = Depends(get_current_user),
     student_id: Optional[int] = Query(None),
     date: Optional[date_type] = Query(None),
@@ -82,7 +82,7 @@ def submit_attendance(
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    school_id: int = Depends(get_valid_school_id),
+    school_id: int = Depends(require_school_module("attendance")),
 ) -> AttendanceSubmission:
     return attendance_controller.submit_attendance(
         payload=payload,

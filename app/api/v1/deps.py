@@ -13,6 +13,7 @@ from app.core.roles import normalize_role
 from app.db.session import SessionLocal
 from app.db.models.user import User
 from app.db.models.user_school import UserSchool
+from app.db.models.school_features import SchoolFeatures
 
 security = HTTPBearer(auto_error=False)
 
@@ -156,6 +157,39 @@ def require_teacher_or_principal(
         )
     return current_user
 
+
+def require_management_or_super_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if normalize_role(current_user.role) not in ["MANAGEMENT", "SUPER_ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+    return current_user
+
+
+def require_management_or_principal(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if normalize_role(current_user.role) not in ["MANAGEMENT", "PRINCIPAL"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+    return current_user
+
+
+def require_management_or_principal_or_super_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if normalize_role(current_user.role) not in ["MANAGEMENT", "PRINCIPAL", "SUPER_ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+    return current_user
+
 # --- SCHOOL CONTEXT VALIDATION ---
 
 
@@ -168,6 +202,9 @@ def get_valid_school_id(
     Verifies the user has an explicit mapping to the school_id provided.
     This prevents users from 'guessing' other school IDs in the query string.
     """
+    if normalize_role(current_user.role) == "SUPER_ADMIN":
+        return school_id
+
     access = db.query(UserSchool).filter(
         UserSchool.user_id == current_user.id,
         UserSchool.school_id == school_id
@@ -180,3 +217,32 @@ def get_valid_school_id(
         )
 
     return school_id
+
+
+def require_school_module(module_code: str):
+    """
+    PRD: block module APIs when a module is not enabled for the school.
+
+    Usage:
+      school_id: int = Depends(require_school_module("attendance"))
+    """
+
+    def _dep(
+        school_id: int = Depends(get_valid_school_id),
+        db: Session = Depends(get_db),
+    ) -> int:
+        row = (
+            db.query(SchoolFeatures)
+            .filter(SchoolFeatures.school_id == school_id)
+            .first()
+        )
+        # Backward-compatible default: allow when modules are not configured.
+        enabled = (row.modules_enabled or []) if row else []
+        if enabled and module_code not in enabled:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"code": "MODULE_NOT_ENABLED", "module": module_code},
+            )
+        return school_id
+
+    return _dep

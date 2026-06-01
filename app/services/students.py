@@ -25,6 +25,7 @@ from app.api.v1.schemas.students import (
     StudentRecentResult,
     StudentReportCardOut,
     StudentReportCardRow,
+    StudentUpdate,
 )
 from app.db.models.class_ import Class
 from app.core.phone import normalize_phone
@@ -164,9 +165,10 @@ def _build_student_out(
         class_name=class_.name if class_ else None,
         roll_number=student.roll_number,
         admission_date=student.admission_date,
+        academic_year=student.academic_year,
         parent_phone=student.parent_phone,
         parent_name=student.parent_name,
-        status="active",
+        status=(student.status or "ACTIVE").lower(),
     )
 
 
@@ -237,11 +239,27 @@ def create_student(*, db: Session, school_id: int, payload: StudentCreate) -> St
         last_name=payload.last_name,
         date_of_birth=payload.date_of_birth,
         gender=payload.gender,
+        status=payload.status,
+        academic_year=payload.academic_year,
         section_id=payload.section_id,
         roll_number=payload.roll_number,
         admission_date=payload.admission_date,
+        admission_number=payload.admission_number,
+        blood_group=payload.blood_group,
+        nationality=payload.nationality,
+        religion=payload.religion,
+        caste_category=payload.caste_category,
+        mother_tongue=payload.mother_tongue,
+        aadhaar_number=payload.aadhaar_number,
+        birth_cert_number=payload.birth_cert_number,
+        previous_school_name=payload.previous_school_name,
+        previous_school_tc_number=payload.previous_school_tc_number,
+        address=payload.address,
         parent_phone=payload.parent_phone,
         parent_name=payload.parent_name,
+        emergency_contact_name=payload.emergency_contact_name,
+        emergency_contact_relation=payload.emergency_contact_relation,
+        emergency_contact_phone=payload.emergency_contact_phone,
         public_id=next_public_id(
             db,
             tenant_code=tenant_code,
@@ -249,6 +267,70 @@ def create_student(*, db: Session, school_id: int, payload: StudentCreate) -> St
             display_year=admission_year,
         ),
     )
+    db.add(student)
+    db.commit()
+    db.refresh(student)
+    return student
+
+
+def update_student(*, db: Session, school_id: int, student_id: str, payload: StudentUpdate) -> Student:
+    student = students_repository.resolve_student_by_ref(
+        db,
+        school_id=school_id,
+        student_ref=student_id,
+    )
+    if not student:
+        raise HTTPException(status_code=404, detail="student_not_found")
+
+    if payload.section_id is not None:
+        section = students_repository.get_section_for_school(
+            db,
+            school_id=school_id,
+            section_id=payload.section_id,
+        )
+        if not section:
+            raise HTTPException(status_code=400, detail="invalid_section_id")
+        student.section_id = payload.section_id
+
+    if payload.first_name is not None:
+        student.first_name = payload.first_name
+    if payload.last_name is not None:
+        student.last_name = payload.last_name
+    if payload.name is not None:
+        student.name = payload.name.strip()
+
+    resolved_name = _resolve_full_name(student.first_name, student.last_name, student.name)
+    if resolved_name:
+        student.name = resolved_name
+
+    for field in [
+        "date_of_birth",
+        "gender",
+        "status",
+        "academic_year",
+        "roll_number",
+        "admission_date",
+        "admission_number",
+        "blood_group",
+        "nationality",
+        "religion",
+        "caste_category",
+        "mother_tongue",
+        "aadhaar_number",
+        "birth_cert_number",
+        "previous_school_name",
+        "previous_school_tc_number",
+        "address",
+        "parent_phone",
+        "parent_name",
+        "emergency_contact_name",
+        "emergency_contact_relation",
+        "emergency_contact_phone",
+    ]:
+        value = getattr(payload, field)
+        if value is not None:
+            setattr(student, field, value)
+
     db.add(student)
     db.commit()
     db.refresh(student)
@@ -555,9 +637,11 @@ def commit_students_import(
             if row.get("date_of_birth")
             else None,
             gender=row.get("gender"),
+            status="ACTIVE",
             section_id=section_id,
             roll_number=roll_number,
             admission_date=admission_date,
+            academic_year=None,
             parent_phone=parent_phone,
             parent_name=row.get("parent_name"),
             public_id=next_public_id(
@@ -627,6 +711,14 @@ def get_student_profile(*, db: Session, school_id: int, student_id: str) -> Stud
                 phone=student.parent_phone,
             )
         )
+    if student.emergency_contact_name or student.emergency_contact_phone:
+        guardians.append(
+            StudentGuardianOut(
+                name=student.emergency_contact_name,
+                relation=student.emergency_contact_relation or "Emergency",
+                phone=student.emergency_contact_phone,
+            )
+        )
 
     return StudentProfileOut(
         id=student.id,
@@ -637,10 +729,22 @@ def get_student_profile(*, db: Session, school_id: int, student_id: str) -> Stud
         class_name=class_.name if class_ else None,
         section_id=section.id if section else None,
         section_name=section.name if section else None,
-        status="active",
+        status=(student.status or "ACTIVE").lower(),
+        academic_year=student.academic_year,
+        admission_number=student.admission_number,
+        previous_school_name=student.previous_school_name,
+        previous_school_tc_number=student.previous_school_tc_number,
         personal_details=StudentPersonalDetails(
             date_of_birth=student.date_of_birth.isoformat() if student.date_of_birth else None,
             gender=student.gender,
+            blood_group=student.blood_group,
+            nationality=student.nationality,
+            religion=student.religion,
+            caste_category=student.caste_category,
+            mother_tongue=student.mother_tongue,
+            aadhaar_number=student.aadhaar_number,
+            birth_cert_number=student.birth_cert_number,
+            address=student.address,
         ),
         guardians=guardians,
         attendance=StudentAttendanceSummary(
@@ -719,6 +823,9 @@ def get_student_report_card(
         total_max += result.max_marks
 
     overall_percentage = round((total_obtained / total_max) * 100, 2) if total_max else 0.0
+    school_name, school_address, academic_year = students_repository.get_school_info_for_report_card(
+        db, school_id=school_id
+    )
     return StudentReportCardOut(
         student_id=student.id,
         student_name=student.name,
@@ -726,6 +833,9 @@ def get_student_report_card(
         public_id=student.public_id,
         class_name=class_.name if class_ else None,
         section_name=section.name if section else None,
+        school_name=school_name,
+        school_address=school_address,
+        academic_year=academic_year,
         attendance_percentage=attendance_percentage,
         present_days=present_days,
         absent_days=absent_days,

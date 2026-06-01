@@ -1,4 +1,4 @@
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -28,6 +28,8 @@ class SchoolContact(Base):
     pin_code: Mapped[str | None] = mapped_column(String(12), nullable=True)
     country: Mapped[str | None] = mapped_column(String(128), nullable=True)
     landmark: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    latitude: Mapped[float | None] = mapped_column(Numeric(10, 8), nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
 
     school_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     school_email: Mapped[str | None] = mapped_column(String(255), nullable=True)

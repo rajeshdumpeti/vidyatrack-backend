@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.phone import to_e164, phone_country_code
 from app.core.roles import normalize_role
 from app.db.models.otp_request import OtpRequest
+from app.db.models.school_features import SchoolFeatures
 from app.db.models.user import User
 from app.db.repositories import auth as auth_repository
 
@@ -466,6 +467,15 @@ def select_role(
 def get_me(*, db: Session, current_user: User) -> dict[str, Any]:
     user_schools = auth_repository.list_user_schools(
         db, user_id=current_user.id)
+    school_ids = [user_school.school_id for user_school in user_schools]
+    features_by_school_id: dict[int, SchoolFeatures] = {}
+    if school_ids:
+        rows = (
+            db.query(SchoolFeatures)
+            .filter(SchoolFeatures.school_id.in_(school_ids))
+            .all()
+        )
+        features_by_school_id = {row.school_id: row for row in rows}
     return {
         "id": current_user.id,
         "phone": current_user.phone,
@@ -475,6 +485,11 @@ def get_me(*, db: Session, current_user: User) -> dict[str, Any]:
                 "id": user_school.school_id,
                 "name": user_school.school.name,
                 "role": user_school.role,
+                "modules_enabled": (
+                    (features_by_school_id.get(user_school.school_id).modules_enabled or [])
+                    if features_by_school_id.get(user_school.school_id)
+                    else []
+                ),
             }
             for user_school in user_schools
         ],

@@ -19,6 +19,7 @@ ENTITY_CODES: dict[str, str] = {
     "teacher": "TCH",
     "principal": "PRN",
     "management_admin": "MGT",
+    "classsubject": "CSB",
 }
 
 SEQUENCE_WIDTH = 6

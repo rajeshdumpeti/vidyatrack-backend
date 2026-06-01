@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 from app.db.models.attendance_record import AttendanceRecord
 from app.db.models.class_ import Class
 from app.db.models.marks_record import MarksRecord
+from app.db.models.school import School
+from app.db.models.school_academic_details import SchoolAcademicDetails
+from app.db.models.school_contact import SchoolContact
 from app.db.models.section import Section
 from app.db.models.student import Student
 from app.db.models.student_import_batch import StudentImportBatch
@@ -53,7 +56,7 @@ def list_students_paginated(
     if search:
         query = query.filter(Student.name.ilike(f"%{search}%"))
     total = query.count()
-    items = query.order_by(Student.id.asc()).offset((page - 1) * limit).limit(limit).all()
+    items = query.order_by(Student.id.desc()).offset((page - 1) * limit).limit(limit).all()
     return items, total
 
 
@@ -226,11 +229,36 @@ def count_attendance(
         .filter(
             AttendanceRecord.school_id == school_id,
             AttendanceRecord.student_id == student_id,
-            AttendanceRecord.status == attendance_status,
+            func.lower(AttendanceRecord.status) == attendance_status.lower(),
         )
         .scalar()
         or 0
     )
+
+
+def get_school_info_for_report_card(
+    db: Session,
+    *,
+    school_id: int,
+) -> tuple[str | None, str | None, str | None]:
+    """Return (school_name, school_address, academic_year) for the report card."""
+    school = db.query(School).filter(School.id == school_id).first()
+    contact = db.query(SchoolContact).filter(SchoolContact.school_id == school_id).first()
+    academic = db.query(SchoolAcademicDetails).filter(SchoolAcademicDetails.school_id == school_id).first()
+
+    school_name = school.name if school else None
+
+    parts: list[str] = []
+    if contact:
+        if contact.city:
+            parts.append(contact.city)
+        if contact.state:
+            parts.append(contact.state)
+    school_address = ", ".join(parts) if parts else None
+
+    academic_year = academic.current_session if academic else None
+
+    return school_name, school_address, academic_year
 
 
 def list_recent_results(

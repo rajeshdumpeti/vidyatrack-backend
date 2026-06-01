@@ -109,6 +109,68 @@ class WhatsAppSendResult:
     provider_error_message: str | None = None
 
 
+def send_credentials_sms(
+    phone: str,
+    *,
+    school_name: str,
+    admin_name: str,
+    temp_password: str,
+) -> WhatsAppSendResult:
+    """Send login credentials via Twilio WhatsApp. phone must be E.164."""
+    missing = next(
+        (name for name, val in [
+            ("TWILIO_ACCOUNT_SID", settings.twilio_account_sid),
+            ("TWILIO_AUTH_TOKEN", settings.twilio_auth_token),
+            ("TWILIO_WHATSAPP_FROM", settings.twilio_whatsapp_from),
+        ] if not val),
+        None,
+    )
+    if missing:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message=f"{missing} is not configured",
+        )
+
+    body = (
+        f"Welcome to VidyaTrack, {admin_name}!\n"
+        f"School: {school_name}\n"
+        f"Login: app.vidyatrack.in\n"
+        f"Phone: {phone}\n"
+        f"Password: {temp_password}\n"
+        f"Change your password after first login."
+    )
+
+    try:
+        client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+        message = client.messages.create(
+            from_=settings.twilio_whatsapp_from,
+            to=f"whatsapp:{phone}",
+            body=body,
+        )
+        return WhatsAppSendResult(
+            success=True,
+            provider_message_id=message.sid,
+            status_code=201,
+        )
+    except TwilioRestException as exc:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=exc.status,
+            provider_error_code=exc.code,
+            provider_error_message=exc.msg,
+        )
+    except Exception as exc:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message=str(exc),
+        )
+
+
 def send_otp_template(phone: str, otp: str) -> WhatsAppSendResult:
     """Send OTP via Twilio WhatsApp. phone must be E.164 (e.g. +919876543210)."""
     missing = next(
@@ -133,6 +195,126 @@ def send_otp_template(phone: str, otp: str) -> WhatsAppSendResult:
             from_=settings.twilio_whatsapp_from,
             to=f"whatsapp:{phone}",
             body=f"Your VidyaTrack OTP is {otp}. Valid for 5 minutes. Do not share with anyone.",
+        )
+        return WhatsAppSendResult(
+            success=True,
+            provider_message_id=message.sid,
+            status_code=201,
+        )
+    except TwilioRestException as exc:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=exc.status,
+            provider_error_code=exc.code,
+            provider_error_message=exc.msg,
+        )
+    except Exception as exc:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message=str(exc),
+        )
+
+
+def send_school_status_sms(
+    phone: str,
+    *,
+    school_name: str,
+    status_label: str,
+    reason: str | None = None,
+) -> WhatsAppSendResult:
+    """Send a school status notification via Twilio WhatsApp."""
+    missing = next(
+        (name for name, val in [
+            ("TWILIO_ACCOUNT_SID", settings.twilio_account_sid),
+            ("TWILIO_AUTH_TOKEN", settings.twilio_auth_token),
+            ("TWILIO_WHATSAPP_FROM", settings.twilio_whatsapp_from),
+        ] if not val),
+        None,
+    )
+    if missing:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message=f"{missing} is not configured",
+        )
+
+    body = (
+        f"VidyaTrack update for '{school_name}':\n"
+        f"Status: {status_label}\n"
+        + (f"Reason: {reason}\n" if reason else "")
+        + "If you believe this is a mistake, contact support."
+    )
+
+    try:
+        client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+        message = client.messages.create(
+            from_=settings.twilio_whatsapp_from,
+            to=f"whatsapp:{phone}",
+            body=body,
+        )
+        return WhatsAppSendResult(
+            success=True,
+            provider_message_id=message.sid,
+            status_code=201,
+        )
+    except TwilioRestException as exc:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=exc.status,
+            provider_error_code=exc.code,
+            provider_error_message=exc.msg,
+        )
+    except Exception as exc:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message=str(exc),
+        )
+
+
+def send_management_alert_sms(
+    phone: str,
+    *,
+    school_name: str,
+    alert_title: str,
+    alert_description: str,
+) -> WhatsAppSendResult:
+    """Send a management alert follow-up to the principal via Twilio WhatsApp."""
+    missing = next(
+        (name for name, val in [
+            ("TWILIO_ACCOUNT_SID", settings.twilio_account_sid),
+            ("TWILIO_AUTH_TOKEN", settings.twilio_auth_token),
+            ("TWILIO_WHATSAPP_FROM", settings.twilio_whatsapp_from),
+        ] if not val),
+        None,
+    )
+    if missing:
+        return WhatsAppSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message=f"{missing} is not configured",
+        )
+
+    body = (
+        f"VidyaTrack alert for {school_name}\n"
+        f"{alert_title}\n"
+        f"{alert_description}\n"
+        "Please review the school dashboard and take action today."
+    )
+
+    try:
+        client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
+        message = client.messages.create(
+            from_=settings.twilio_whatsapp_from,
+            to=f"whatsapp:{phone}",
+            body=body,
         )
         return WhatsAppSendResult(
             success=True,

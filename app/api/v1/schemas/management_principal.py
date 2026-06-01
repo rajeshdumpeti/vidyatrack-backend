@@ -86,3 +86,37 @@ class PrincipalOnboardingVerifyOut(BaseModel):
     principal: ManagementPrincipalOut
     deactivated_principals: list[PrincipalHistoryOut]
     message: str
+
+
+class PrincipalOnboardingSessionOut(BaseModel):
+    session_id: int
+    name: str
+    phone_masked: str
+    email: str | None = None
+    status: str
+    expires_at: datetime
+    created_at: datetime
+    verified_at: datetime | None = None
+
+
+class PrincipalOnboardingCancelIn(BaseModel):
+    school_id: int = Field(gt=0)
+    session_id: int = Field(gt=0)
+
+
+class PrincipalOnboardingCancelOut(BaseModel):
+    success: bool
+    message: str
+
+
+class PrincipalTimelineItemOut(BaseModel):
+    id: str
+    event_type: str
+    title: str
+    description: str
+    status: str
+    created_at: datetime
+
+
+class PrincipalTimelineOut(BaseModel):
+    items: list[PrincipalTimelineItemOut]

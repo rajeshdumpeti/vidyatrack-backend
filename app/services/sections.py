@@ -39,6 +39,9 @@ def create_section(*, db: Session, school_id: int, payload: SectionCreate) -> Se
         name=payload.name,
         class_id=payload.class_id,
         school_id=school_id,
+        capacity=40,
+        room_number=None,
+        is_active=True,
         public_id=next_public_id(
             db,
             tenant_code=get_tenant_code_for_school(db, school_id),

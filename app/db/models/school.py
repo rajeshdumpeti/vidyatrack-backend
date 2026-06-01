@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
@@ -39,6 +39,20 @@ class School(Base):
     )
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="ACTIVE"
+    )
+
+    # PRD fields (Phase 1 Super Admin)
+    plan_type: Mapped[str] = mapped_column(String(32), nullable=False, default="pilot")
+    is_test: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    trial_ends_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+    billing_starts_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+    suspended_at: Mapped["DateTime | None"] = mapped_column(DateTime(timezone=True), nullable=True)
+    suspension_reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    management_setup_complete: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    management_setup_completed_at: Mapped["DateTime | None"] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     created_by: Mapped[int | None] = mapped_column(

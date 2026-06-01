@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 
@@ -32,3 +32,6 @@ class Section(Base):
     )
 
     name: Mapped[str] = mapped_column(String(50), nullable=False)
+    capacity: Mapped[int] = mapped_column(Integer, nullable=False, default=40)
+    room_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)

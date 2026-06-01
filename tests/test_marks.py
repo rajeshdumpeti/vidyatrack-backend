@@ -11,10 +11,12 @@ from app.db.models.marks_record import MarksRecord
 from app.db.models.marks_submission import MarksSubmission
 from app.db.models.notification_outbox import NotificationOutbox
 from app.db.models.school import School
+from app.db.models.school_features import SchoolFeatures
 from app.db.models.section import Section
 from app.db.models.student import Student
 from app.db.models.subject import Subject
 from app.db.models.user import User
+from app.db.models.user_school import UserSchool
 from app.main import app
 
 
@@ -31,6 +33,8 @@ def _build_client():
         tables=[
             User.__table__,
             School.__table__,
+            UserSchool.__table__,
+            SchoolFeatures.__table__,
             Class.__table__,
             Section.__table__,
             Subject.__table__,
@@ -55,6 +59,14 @@ def _build_client():
             id=500,
             phone="+16190000001",
             email="teacher@example.com",
+            role="TEACHER",
+            is_active=True,
+        )
+    )
+    db.add(
+        UserSchool(
+            user_id=500,
+            school_id=18,
             role="TEACHER",
             is_active=True,
         )
@@ -209,4 +221,3 @@ def test_marks_record_returns_200_on_idempotent_update():
     finally:
         app.dependency_overrides.clear()
         db.close()
-

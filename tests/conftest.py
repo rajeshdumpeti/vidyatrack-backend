@@ -9,10 +9,14 @@ from app.db.base import Base
 from app.db.models.idempotency_key import IdempotencyKey
 from app.db.models.management_admin import ManagementAdmin
 from app.db.models.public_id_counter import PublicIdCounter
+from app.db.models.audit_log import AuditLog
 from app.db.models.school import School
 from app.db.models.school_academic_details import SchoolAcademicDetails
 from app.db.models.school_contact import SchoolContact
 from app.db.models.school_features import SchoolFeatures
+from app.db.models.school_grade import SchoolGrade
+from app.db.models.class_ import Class
+from app.db.models.student import Student
 from app.db.models.school_onboarding_draft import SchoolOnboardingDraft
 from app.db.models.user import User
 from app.db.models.user_school import UserSchool
@@ -37,10 +41,14 @@ def db_session():
             SchoolContact.__table__,
             SchoolAcademicDetails.__table__,
             SchoolFeatures.__table__,
+            SchoolGrade.__table__,
+            Class.__table__,
             ManagementAdmin.__table__,
             SchoolOnboardingDraft.__table__,
             IdempotencyKey.__table__,
             PublicIdCounter.__table__,
+            AuditLog.__table__,
+            Student.__table__,
         ],
     )
 

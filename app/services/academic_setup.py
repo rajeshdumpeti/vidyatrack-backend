@@ -22,11 +22,18 @@ def get_academic_setup(*, db: Session, school_id: int) -> AcademicSetupOut:
         db.query(
             Section.id.label("id"),
             Section.name.label("name"),
+            Section.capacity.label("capacity"),
+            Section.room_number.label("room_number"),
+            Section.is_active.label("is_active"),
             Section.class_id.label("class_id"),
             Class.name.label("class_name"),
         )
         .join(Class, Class.id == Section.class_id)
-        .filter(Section.school_id == school_id, Class.school_id == school_id)
+        .filter(
+            Section.school_id == school_id,
+            Class.school_id == school_id,
+            Section.is_active.is_(True),
+        )
         .order_by(Class.name.asc(), Section.name.asc())
         .all()
     )

@@ -4,7 +4,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.v1.controllers import communications as communications_controller
-from app.api.v1.deps import get_db, get_valid_school_id, require_teacher_or_principal
+from app.api.v1.deps import (
+    get_db,
+    require_school_module,
+    require_teacher_or_management_or_principal,
+)
 from app.api.v1.schemas.communications import (
     HomeworkCreate,
     HomeworkOut,
@@ -19,8 +23,8 @@ router = APIRouter(prefix="/communications", tags=["communications"])
 def create_homework(
     payload: HomeworkCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_teacher_or_principal),
-    school_id: int = Depends(get_valid_school_id),
+    current_user: User = Depends(require_teacher_or_management_or_principal),
+    school_id: int = Depends(require_school_module("communication")),
 ) -> HomeworkOut:
     return communications_controller.create_homework(
         payload=payload,
@@ -32,11 +36,11 @@ def create_homework(
 
 @router.get("/homework", response_model=List[HomeworkOut])
 def list_homework(
-    school_id: int = Depends(get_valid_school_id),
+    school_id: int = Depends(require_school_module("communication")),
     section_id: int | None = Query(None),
     subject_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_teacher_or_principal),
+    current_user: User = Depends(require_teacher_or_management_or_principal),
 ) -> list[HomeworkOut]:
     return communications_controller.list_homework(
         school_id=school_id,
@@ -51,8 +55,8 @@ def list_homework(
 def create_parent_message(
     payload: ParentMessageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_teacher_or_principal),
-    school_id: int = Depends(get_valid_school_id),
+    current_user: User = Depends(require_teacher_or_management_or_principal),
+    school_id: int = Depends(require_school_module("communication")),
 ) -> ParentMessageOut:
     return communications_controller.create_parent_message(
         payload=payload,
@@ -64,10 +68,10 @@ def create_parent_message(
 
 @router.get("/parent-messages", response_model=List[ParentMessageOut])
 def list_parent_messages(
-    school_id: int = Depends(get_valid_school_id),
+    school_id: int = Depends(require_school_module("communication")),
     section_id: int | None = Query(None),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_teacher_or_principal),
+    current_user: User = Depends(require_teacher_or_management_or_principal),
 ) -> list[ParentMessageOut]:
     return communications_controller.list_parent_messages(
         school_id=school_id,

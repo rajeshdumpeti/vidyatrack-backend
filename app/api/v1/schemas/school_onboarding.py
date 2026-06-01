@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -44,6 +44,7 @@ class Phase1OnboardingIn(BaseModel):
     admin_employee_id: str | None = Field(default=None, max_length=64)
     admin_phone: str = Field(min_length=10, max_length=20)
     admin_email: str = Field(min_length=5, max_length=255)
+    send_credentials_via: Literal["sms", "email", "both"] = "sms"
     language_preference: str | None = Field(default=None, max_length=32)
     timezone: str | None = Field(default=None, max_length=64)
 

@@ -12,6 +12,7 @@ from app.api.v1.schemas.students import (
     StudentOut,
     StudentProfileOut,
     StudentReportCardOut,
+    StudentUpdate,
 )
 from app.db.models.student import Student
 from app.db.models.user import User
@@ -43,6 +44,15 @@ def list_students_paginated(
 
 def create_student(*, db: Session, school_id: int, payload: StudentCreate) -> Student:
     return students_service.create_student(db=db, school_id=school_id, payload=payload)
+
+
+def update_student(*, db: Session, school_id: int, student_id: str, payload: StudentUpdate) -> Student:
+    return students_service.update_student(
+        db=db,
+        school_id=school_id,
+        student_id=student_id,
+        payload=payload,
+    )
 
 
 async def preview_students_import(

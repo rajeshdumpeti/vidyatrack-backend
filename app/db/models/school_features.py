@@ -28,6 +28,7 @@ class SchoolFeatures(Base):
     api_access: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     bulk_operations: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     custom_reports: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notification_preferences: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

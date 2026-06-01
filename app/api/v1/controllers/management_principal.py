@@ -11,7 +11,10 @@ from app.api.v1.schemas.management_principal import (
     ManagementPrincipalOut,
     ManagementPrincipalRegisterOut,
     PrincipalHistoryOut,
+    PrincipalOnboardingCancelOut,
+    PrincipalOnboardingSessionOut,
     PrincipalOnboardingStartOut,
+    PrincipalTimelineOut,
     PrincipalOnboardingVerifyOut,
 )
 from app.db.models.user import User
@@ -38,6 +41,32 @@ def list_principal_history(
     current_user: User,
 ) -> list[PrincipalHistoryOut]:
     return management_principal_service.list_principal_history(
+        school_id=school_id,
+        db=db,
+        current_user=current_user,
+    )
+
+
+def get_latest_principal_onboarding_session(
+    *,
+    school_id: int,
+    db: Session,
+    current_user: User,
+) -> PrincipalOnboardingSessionOut | None:
+    return management_principal_service.get_latest_principal_onboarding_session(
+        school_id=school_id,
+        db=db,
+        current_user=current_user,
+    )
+
+
+def get_principal_timeline(
+    *,
+    school_id: int,
+    db: Session,
+    current_user: User,
+) -> PrincipalTimelineOut:
+    return management_principal_service.get_principal_timeline(
         school_id=school_id,
         db=db,
         current_user=current_user,
@@ -104,6 +133,21 @@ def verify_principal_onboarding(
         db=db,
         current_user=current_user,
         otp_pepper=otp_pepper,
+    )
+
+
+def cancel_principal_onboarding(
+    *,
+    school_id: int,
+    session_id: int,
+    db: Session,
+    current_user: User,
+) -> PrincipalOnboardingCancelOut:
+    return management_principal_service.cancel_principal_onboarding(
+        school_id=school_id,
+        session_id=session_id,
+        db=db,
+        current_user=current_user,
     )
 
 

@@ -35,6 +35,65 @@ def _parse_error_response(raw_body: str) -> tuple[str | None, str | None]:
     )
 
 
+def send_credentials_email(
+    to_email: str,
+    *,
+    school_name: str,
+    admin_name: str,
+    phone: str,
+    temp_password: str,
+) -> EmailSendResult:
+    if not settings.brevo_api_key:
+        return EmailSendResult(success=False, provider_message_id=None, status_code=0,
+                               provider_error_message="BREVO_API_KEY not configured")
+    if not settings.brevo_sender_email:
+        return EmailSendResult(success=False, provider_message_id=None, status_code=0,
+                               provider_error_message="BREVO_SENDER_EMAIL not configured")
+
+    base_url = settings.brevo_api_base_url.rstrip("/")
+    url = f"{base_url}/smtp/email"
+    text_body = (
+        f"Welcome to VidyaTrack, {admin_name}!\n\n"
+        f"Your school '{school_name}' has been registered on VidyaTrack.\n\n"
+        f"Your login credentials:\n"
+        f"  Login URL : app.vidyatrack.in\n"
+        f"  Phone     : {phone}\n"
+        f"  Password  : {temp_password}\n\n"
+        f"Please change your password after your first login.\n\n"
+        f"For support, contact: +91 86868 66818\n\n"
+        f"— VidyaTrack Team"
+    )
+    payload = {
+        "sender": {"name": settings.brevo_sender_name, "email": settings.brevo_sender_email},
+        "to": [{"email": to_email, "name": admin_name}],
+        "subject": f"Welcome to VidyaTrack — Your School '{school_name}' is Ready",
+        "textContent": text_body,
+    }
+    request = Request(
+        url=url,
+        headers={
+            "accept": "application/json",
+            "api-key": settings.brevo_api_key,
+            "content-type": "application/json",
+        },
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=10) as response:
+            status_code = response.getcode()
+            body = response.read().decode("utf-8")
+            parsed = json.loads(body) if body else {}
+            provider_message_id = str(parsed.get("messageId")) if isinstance(parsed, dict) and parsed.get("messageId") else None
+            return EmailSendResult(success=200 <= status_code < 300, provider_message_id=provider_message_id, status_code=status_code)
+    except HTTPError as exc:
+        raw_error = exc.read().decode("utf-8", errors="ignore")
+        ec, em = _parse_error_response(raw_error)
+        return EmailSendResult(success=False, provider_message_id=None, status_code=exc.code, provider_error_code=ec, provider_error_message=em)
+    except URLError:
+        return EmailSendResult(success=False, provider_message_id=None, status_code=0, provider_error_message="network_error")
+
+
 def send_otp_email(to_email: str, otp: str) -> EmailSendResult:
     if not settings.brevo_api_key:
         raise ValueError("BREVO_API_KEY is not configured")
@@ -102,3 +161,82 @@ def send_otp_email(to_email: str, otp: str) -> EmailSendResult:
             provider_error_message="network_error",
         )
 
+
+def send_management_alert_email(
+    to_email: str,
+    *,
+    principal_name: str,
+    school_name: str,
+    alert_title: str,
+    alert_description: str,
+) -> EmailSendResult:
+    if not settings.brevo_api_key:
+        return EmailSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message="BREVO_API_KEY not configured",
+        )
+    if not settings.brevo_sender_email:
+        return EmailSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message="BREVO_SENDER_EMAIL not configured",
+        )
+
+    base_url = settings.brevo_api_base_url.rstrip("/")
+    url = f"{base_url}/smtp/email"
+    text_body = (
+        f"Dear {principal_name},\n\n"
+        f"Management has flagged an item for {school_name}.\n\n"
+        f"Alert: {alert_title}\n"
+        f"Details: {alert_description}\n\n"
+        "Please review the school dashboard and take action.\n\n"
+        "— VidyaTrack"
+    )
+    payload = {
+        "sender": {"name": settings.brevo_sender_name, "email": settings.brevo_sender_email},
+        "to": [{"email": to_email, "name": principal_name}],
+        "subject": f"VidyaTrack alert for {school_name}",
+        "textContent": text_body,
+    }
+    request = Request(
+        url=url,
+        headers={
+            "accept": "application/json",
+            "api-key": settings.brevo_api_key,
+            "content-type": "application/json",
+        },
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            status_code = response.getcode()
+            body = response.read().decode("utf-8")
+            parsed = json.loads(body) if body else {}
+            provider_message_id = str(parsed.get("messageId")) if isinstance(parsed, dict) and parsed.get("messageId") else None
+            return EmailSendResult(
+                success=200 <= status_code < 300,
+                provider_message_id=provider_message_id,
+                status_code=status_code,
+            )
+    except HTTPError as exc:
+        raw_error = exc.read().decode("utf-8", errors="ignore")
+        ec, em = _parse_error_response(raw_error)
+        return EmailSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=exc.code,
+            provider_error_code=ec,
+            provider_error_message=em,
+        )
+    except URLError:
+        return EmailSendResult(
+            success=False,
+            provider_message_id=None,
+            status_code=0,
+            provider_error_message="network_error",
+        )

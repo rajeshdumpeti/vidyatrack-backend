@@ -108,6 +108,7 @@ class Settings(BaseSettings):
     # Super admin bootstrap (set once per environment, never changes after)
     super_admin_phone: str | None = Field(default=None, alias="SUPER_ADMIN_PHONE")
     super_admin_email: str | None = Field(default=None, alias="SUPER_ADMIN_EMAIL")
+    super_admin_password: str | None = Field(default=None, alias="SUPER_ADMIN_PASSWORD")
 
     cors_allow_origins: str = Field(
         default="",
